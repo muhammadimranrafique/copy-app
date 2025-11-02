@@ -1,5 +1,5 @@
 from sqlmodel import SQLModel, Field, Relationship
-from typing import Optional
+from typing import Optional, List
 from datetime import datetime
 from uuid import UUID, uuid4
 from enum import Enum
@@ -26,15 +26,7 @@ class PaymentMode(str, Enum):
     CHEQUE = "Cheque"
     UPI = "UPI"
 
-class ExpenseCategory(str, Enum):
-    PRINTING = "Printing"
-    DELIVERY = "Delivery"
-    MATERIAL = "Material"
-    STAFF = "Staff"
-    UTILITIES = "Utilities"
-    MISC = "Misc"
-
-# Models
+# Base Models
 class ClientBase(SQLModel):
     name: str
     type: ClientType
@@ -48,7 +40,7 @@ class Client(ClientBase, table=True):
     id: UUID = Field(default_factory=uuid4, primary_key=True)
     created_at: datetime = Field(default_factory=datetime.utcnow)
     
-    orders: list["Order"] = Relationship(back_populates="client")
+    orders: List["Order"] = Relationship(back_populates="client")
 
 class ClientCreate(ClientBase):
     pass
@@ -57,6 +49,7 @@ class ClientRead(ClientBase):
     id: UUID
     created_at: datetime
 
+# Product Models
 class ProductBase(SQLModel):
     name: str
     category: str
@@ -64,6 +57,7 @@ class ProductBase(SQLModel):
     sale_price: float
     stock_quantity: int
     unit: str = "pcs"
+    is_active: bool = True
 
 class Product(ProductBase, table=True):
     __tablename__ = "products"
@@ -72,14 +66,27 @@ class Product(ProductBase, table=True):
     created_at: datetime = Field(default_factory=datetime.utcnow)
     updated_at: datetime = Field(default_factory=datetime.utcnow)
 
-class ProductCreate(ProductBase):
-    pass
+class ProductCreate(SQLModel):
+    productName: str
+    category: str
+    costPrice: float
+    salePrice: float
+    stockQuantity: int
+    unit: str = "pcs"
 
-class ProductRead(ProductBase):
+class ProductRead(SQLModel):
     id: UUID
+    productName: str
+    category: str
+    costPrice: float
+    salePrice: float
+    stockQuantity: int
+    unit: str
+    is_active: bool
     created_at: datetime
     updated_at: datetime
 
+# Order Models
 class OrderBase(SQLModel):
     order_number: str
     client_id: UUID = Field(foreign_key="clients.id")
@@ -94,44 +101,61 @@ class Order(OrderBase, table=True):
     created_at: datetime = Field(default_factory=datetime.utcnow)
     
     client: Client = Relationship(back_populates="orders")
-    payments: list["Payment"] = Relationship(back_populates="order")
+    payments: List["Payment"] = Relationship(back_populates="order")
 
-class OrderCreate(OrderBase):
-    pass
+class OrderCreate(SQLModel):
+    orderNumber: str
+    leaderId: UUID
+    totalAmount: float
+    status: str = "Pending"
 
-class OrderRead(OrderBase):
+class OrderRead(SQLModel):
     id: UUID
-    order_date: datetime
+    orderNumber: str
+    leaderId: UUID
+    totalAmount: float
+    status: str
+    orderDate: datetime
     created_at: datetime
 
+# Payment Models
 class PaymentBase(SQLModel):
-    order_id: UUID = Field(foreign_key="orders.id")
     amount: float
     mode: PaymentMode
-    status: PaymentStatus
+    status: PaymentStatus = PaymentStatus.COMPLETED
     reference_number: Optional[str] = None
 
 class Payment(PaymentBase, table=True):
     __tablename__ = "payments"
     
     id: UUID = Field(default_factory=uuid4, primary_key=True)
+    order_id: Optional[UUID] = Field(foreign_key="orders.id", default=None)
     payment_date: datetime = Field(default_factory=datetime.utcnow)
     created_at: datetime = Field(default_factory=datetime.utcnow)
     
-    order: Order = Relationship(back_populates="payments")
+    order: Optional[Order] = Relationship(back_populates="payments")
 
-class PaymentCreate(PaymentBase):
-    pass
+class PaymentCreate(SQLModel):
+    amount: float
+    method: str
+    leaderId: UUID
+    referenceNumber: Optional[str] = None
 
-class PaymentRead(PaymentBase):
+class PaymentRead(SQLModel):
     id: UUID
-    payment_date: datetime
-    created_at: datetime
+    amount: float
+    method: str
+    paymentDate: datetime
+    leaderId: Optional[UUID] = None
+    referenceNumber: Optional[str] = None
 
+# Expense Models
 class ExpenseBase(SQLModel):
-    category: ExpenseCategory
+    category: str
     amount: float
     description: str
+    payment_method: Optional[str] = "Cash"
+    reference_number: Optional[str] = None
 
 class Expense(ExpenseBase, table=True):
     __tablename__ = "expenses"
@@ -140,13 +164,22 @@ class Expense(ExpenseBase, table=True):
     expense_date: datetime = Field(default_factory=datetime.utcnow)
     created_at: datetime = Field(default_factory=datetime.utcnow)
 
-class ExpenseCreate(ExpenseBase):
-    pass
+class ExpenseCreate(SQLModel):
+    category: str
+    amount: float
+    description: str
+    expenseDate: str
+    paymentMethod: Optional[str] = "Cash"
+    referenceNumber: Optional[str] = None
 
-class ExpenseRead(ExpenseBase):
+class ExpenseRead(SQLModel):
     id: UUID
-    expense_date: datetime
-    created_at: datetime
+    category: str
+    amount: float
+    description: str
+    expenseDate: datetime
+    paymentMethod: Optional[str]
+    referenceNumber: Optional[str]
 
 # User Model for Authentication
 class UserBase(SQLModel):

@@ -56,14 +56,26 @@ export default function Products() {
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
+    
+    if (!formData.productName.trim()) {
+      toast.error('Please enter a product name');
+      return;
+    }
+    
+    if (formData.salePrice <= 0) {
+      toast.error('Sale price must be greater than 0');
+      return;
+    }
+    
     try {
       await createProduct(formData);
       toast.success('Product created successfully');
       setDialogOpen(false);
       setFormData({ productName: '', category: '', costPrice: 0, salePrice: 0, stockQuantity: 0, unit: 'pcs' });
       loadProducts();
-    } catch (error) {
-      toast.error('Failed to create product');
+    } catch (error: any) {
+      console.error('Product creation error:', error);
+      toast.error(error?.message || 'Failed to create product');
     }
   };
 

@@ -11,11 +11,11 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from 
 import { Label } from '@/components/ui/label';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { toast } from 'sonner';
+import { Toaster } from 'sonner';
 import { Badge } from '@/components/ui/badge';
 import { format } from 'date-fns';
 import { Textarea } from '@/components/ui/textarea';
 import { LoadingSpinner } from '@/components/LoadingSpinner';
-import { ErrorBoundary } from '@/components/ErrorBoundary';
 
 interface Expense {
   id: string;
@@ -67,9 +67,7 @@ export default function Expenses() {
     () => getExpenses({}),
     {
       isReady: !authLoading && !!user,
-      onError: (err) => toast.error(`Failed to load expenses: ${err.message}`),
-      retryCount: 3,
-      retryDelay: (attemptIndex) => Math.min(1000 * 2 ** attemptIndex, 30000)
+      onError: (err) => toast.error(`Failed to load expenses: ${err.message}`)
     }
   );
 
@@ -133,20 +131,7 @@ export default function Expenses() {
     }
 
     try {
-      const result = await createExpense(formData);
-      if (result.success) {
-        toast.success('Expense created successfully');
-        setDialogOpen(false);
-        setFormData({
-          category: 'Materials',
-          amount: 0,
-          description: '',
-          expenseDate: new Date().toISOString().split('T')[0],
-          paymentMethod: 'Cash',
-          referenceNumber: ''
-        });
-        refetchExpenses();
-      }
+      await createExpense(formData);
       toast.success('Expense added successfully');
       setDialogOpen(false);
       setFormData({
@@ -158,8 +143,9 @@ export default function Expenses() {
         referenceNumber: ''
       });
       refetchExpenses();
-    } catch (error) {
-      toast.error('Failed to add expense');
+    } catch (error: any) {
+      console.error('Expense creation error:', error);
+      toast.error(error?.message || 'Failed to add expense');
     }
   };
 
@@ -172,8 +158,9 @@ export default function Expenses() {
       await deleteExpense(id);
       toast.success('Expense deleted successfully');
       refetchExpenses();
-    } catch (error) {
-      toast.error('Failed to delete expense');
+    } catch (error: any) {
+      console.error('Expense deletion error:', error);
+      toast.error(error?.message || 'Failed to delete expense');
     }
   };
 
@@ -196,14 +183,6 @@ export default function Expenses() {
     };
     return colors[method || 'Cash'] || 'bg-gray-100 text-gray-700';
   };
-
-  if (loading) {
-    return (
-      <div className="flex items-center justify-center h-64">
-        <div className="text-lg text-gray-600">Loading expenses...</div>
-      </div>
-    );
-  }
 
   return (
     <div className="space-y-6">
@@ -274,8 +253,7 @@ export default function Expenses() {
                   id="description"
                   value={formData.description}
                   onChange={(e) => setFormData({ ...formData, description: e.target.value })}
-                  placeholder="Enter expense description..."
-                  rows={3}
+                  placeholder="Enter expense description"
                   required
                 />
               </div>
@@ -303,153 +281,145 @@ export default function Expenses() {
                 <Label htmlFor="referenceNumber">Reference Number (Optional)</Label>
                 <Input
                   id="referenceNumber"
-                  type="text"
                   value={formData.referenceNumber}
                   onChange={(e) => setFormData({ ...formData, referenceNumber: e.target.value })}
-                  placeholder="e.g., EXP-001"
+                  placeholder="Enter reference number"
                 />
               </div>
 
-              <div className="flex gap-2 pt-4">
-                <Button type="submit" className="flex-1">Add Expense</Button>
-                <Button type="button" variant="outline" onClick={() => setDialogOpen(false)}>
-                  Cancel
-                </Button>
-              </div>
+              <Button type="submit" className="w-full">
+                Add Expense
+              </Button>
             </form>
           </DialogContent>
         </Dialog>
       </div>
 
+      {/* Filters */}
+      <div className="flex flex-wrap gap-4">
+        <div className="flex-1 min-w-[200px]">
+          <Label htmlFor="filterCategory">Filter by Category</Label>
+          <Select value={filterCategory} onValueChange={setFilterCategory}>
+            <SelectTrigger>
+              <SelectValue />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="All">All Categories</SelectItem>
+              {EXPENSE_CATEGORIES.map((cat) => (
+                <SelectItem key={cat} value={cat}>
+                  {cat}
+                </SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
+        </div>
+        
+        <div className="flex-1 min-w-[150px]">
+          <Label htmlFor="startDate">Start Date</Label>
+          <Input
+            id="startDate"
+            type="date"
+            value={startDate}
+            onChange={(e) => setStartDate(e.target.value)}
+          />
+        </div>
+        
+        <div className="flex-1 min-w-[150px]">
+          <Label htmlFor="endDate">End Date</Label>
+          <Input
+            id="endDate"
+            type="date"
+            value={endDate}
+            onChange={(e) => setEndDate(e.target.value)}
+          />
+        </div>
+      </div>
+
       {/* Summary Card */}
       <Card>
-        <CardContent className="pt-6">
-          <div className="flex items-center gap-4">
-            <div className="p-3 bg-red-100 rounded-lg">
-              <Receipt className="h-6 w-6 text-red-600" />
-            </div>
+        <CardContent className="p-6">
+          <div className="flex items-center justify-between">
             <div>
               <p className="text-sm text-gray-600">Total Expenses</p>
-              <p className="text-2xl font-bold text-gray-900">{formatCurrency(totalExpenses)}</p>
-              <p className="text-xs text-gray-500 mt-1">
-                {filteredExpenses.length} expense{filteredExpenses.length !== 1 ? 's' : ''} recorded
-              </p>
+              <p className="text-2xl font-bold text-red-600">{formatCurrency(totalExpenses)}</p>
+            </div>
+            <div className="text-right">
+              <p className="text-sm text-gray-600">Filtered Results</p>
+              <p className="text-lg font-semibold">{filteredExpenses.length} expenses</p>
             </div>
           </div>
         </CardContent>
       </Card>
 
-      {/* Filters */}
-      <Card>
-        <CardContent className="pt-6">
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-            <div>
-              <Label htmlFor="filterCategory">Filter by Category</Label>
-              <Select value={filterCategory} onValueChange={setFilterCategory}>
-                <SelectTrigger>
-                  <SelectValue placeholder="All Categories" />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="All">All Categories</SelectItem>
-                  {EXPENSE_CATEGORIES.map((cat) => (
-                    <SelectItem key={cat} value={cat}>
-                      {cat}
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-            </div>
-
-            <div>
-              <Label htmlFor="startDate">Start Date</Label>
-              <Input
-                id="startDate"
-                type="date"
-                value={startDate}
-                onChange={(e) => setStartDate(e.target.value)}
-              />
-            </div>
-
-            <div>
-              <Label htmlFor="endDate">End Date</Label>
-              <Input
-                id="endDate"
-                type="date"
-                value={endDate}
-                onChange={(e) => setEndDate(e.target.value)}
-              />
-            </div>
+      {/* Expenses List */}
+      <div className="space-y-4">
+        {filteredExpenses.map((expense) => (
+          <Card key={expense.id}>
+            <CardContent className="p-6">
+              <div className="flex items-start justify-between">
+                <div className="flex-1">
+                  <div className="flex items-center gap-2 mb-2">
+                    <Receipt className="h-4 w-4 text-gray-500" />
+                    <Badge className={getCategoryBadge(expense.category)}>
+                      {expense.category}
+                    </Badge>
+                    {expense.paymentMethod && (
+                      <Badge variant="outline" className={getPaymentMethodBadge(expense.paymentMethod)}>
+                        {expense.paymentMethod}
+                      </Badge>
+                    )}
+                  </div>
+                  
+                  <h3 className="font-semibold text-lg mb-1">{expense.description}</h3>
+                  
+                  <div className="flex items-center gap-4 text-sm text-gray-600">
+                    <span>Date: {format(new Date(expense.expenseDate), 'MMM dd, yyyy')}</span>
+                    {expense.referenceNumber && (
+                      <span>Ref: {expense.referenceNumber}</span>
+                    )}
+                  </div>
+                </div>
+                
+                <div className="flex items-center gap-3">
+                  <div className="text-right">
+                    <p className="text-2xl font-bold text-red-600">
+                      {formatCurrency(expense.amount)}
+                    </p>
+                  </div>
+                  
+                  <div className="flex gap-2">
+                    <Button variant="outline" size="sm">
+                      <Edit className="h-4 w-4" />
+                    </Button>
+                    <Button 
+                      variant="outline" 
+                      size="sm" 
+                      onClick={() => handleDelete(expense.id)}
+                      className="text-red-600 hover:text-red-700"
+                    >
+                      <Trash2 className="h-4 w-4" />
+                    </Button>
+                  </div>
+                </div>
+              </div>
+            </CardContent>
+          </Card>
+        ))}
+        
+        {filteredExpenses.length === 0 && (
+          <div className="text-center py-12">
+            <Receipt className="h-12 w-12 text-gray-400 mx-auto mb-4" />
+            <p className="text-gray-600">No expenses found</p>
+            <p className="text-sm text-gray-500 mt-1">
+              {filterCategory !== 'All' || startDate || endDate
+                ? 'Try adjusting your filters'
+                : 'Add your first expense to get started'
+              }
+            </p>
           </div>
-        </CardContent>
-      </Card>
-
-      {/* Expenses Table */}
-      <Card>
-        <CardContent className="pt-6">
-          {filteredExpenses.length === 0 ? (
-            <div className="text-center py-12">
-              <Receipt className="h-12 w-12 text-gray-400 mx-auto mb-4" />
-              <p className="text-gray-600">No expenses found</p>
-              <p className="text-sm text-gray-500 mt-1">Add your first expense to get started</p>
-            </div>
-          ) : (
-            <div className="overflow-x-auto">
-              <table className="w-full">
-                <thead>
-                  <tr className="border-b">
-                    <th className="text-left py-3 px-4 font-semibold text-gray-700">Date</th>
-                    <th className="text-left py-3 px-4 font-semibold text-gray-700">Category</th>
-                    <th className="text-left py-3 px-4 font-semibold text-gray-700">Description</th>
-                    <th className="text-right py-3 px-4 font-semibold text-gray-700">Amount</th>
-                    <th className="text-left py-3 px-4 font-semibold text-gray-700">Payment Method</th>
-                    <th className="text-left py-3 px-4 font-semibold text-gray-700">Reference</th>
-                    <th className="text-right py-3 px-4 font-semibold text-gray-700">Actions</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {filteredExpenses.map((expense) => (
-                    <tr key={expense.id} className="border-b hover:bg-gray-50">
-                      <td className="py-3 px-4">
-                        {format(new Date(expense.expenseDate), 'MMM dd, yyyy')}
-                      </td>
-                      <td className="py-3 px-4">
-                        <Badge className={getCategoryBadge(expense.category)}>
-                          {expense.category}
-                        </Badge>
-                      </td>
-                      <td className="py-3 px-4 max-w-xs truncate" title={expense.description}>
-                        {expense.description}
-                      </td>
-                      <td className="py-3 px-4 text-right font-semibold text-red-600">
-                        {formatCurrency(expense.amount)}
-                      </td>
-                      <td className="py-3 px-4">
-                        <Badge className={getPaymentMethodBadge(expense.paymentMethod)}>
-                          {expense.paymentMethod || 'Cash'}
-                        </Badge>
-                      </td>
-                      <td className="py-3 px-4 text-sm text-gray-600">
-                        {expense.referenceNumber || '-'}
-                      </td>
-                      <td className="py-3 px-4 text-right">
-                        <Button
-                          variant="ghost"
-                          size="sm"
-                          onClick={() => handleDelete(expense.id)}
-                          className="text-red-600 hover:text-red-700 hover:bg-red-50"
-                        >
-                          <Trash2 className="h-4 w-4" />
-                        </Button>
-                      </td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
-            </div>
-          )}
-        </CardContent>
-      </Card>
+        )}
+      </div>
+      <Toaster position="top-right" richColors />
     </div>
   );
 }
-

@@ -70,8 +70,18 @@ export default function Orders() {
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
+    if (!formData.orderNumber.trim()) {
+      toast.error('Please enter an order number');
+      return;
+    }
+    
     if (!formData.leaderId) {
       toast.error('Please select a leader');
+      return;
+    }
+    
+    if (formData.totalAmount <= 0) {
+      toast.error('Total amount must be greater than 0');
       return;
     }
     try {
@@ -85,9 +95,10 @@ export default function Orders() {
         totalAmount: 0,
         status: 'Pending'
       });
-      loadData();
-    } catch (error) {
-      toast.error('Failed to create order');
+      loadOrders();
+    } catch (error: any) {
+      console.error('Order creation error:', error);
+      toast.error(error?.message || 'Failed to create order');
     }
   };
 
