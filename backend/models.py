@@ -1,4 +1,5 @@
 from sqlmodel import SQLModel, Field, Relationship
+from pydantic import Field as PydanticField
 from typing import Optional, List
 from datetime import datetime
 from uuid import UUID, uuid4
@@ -76,15 +77,19 @@ class ProductCreate(SQLModel):
 
 class ProductRead(SQLModel):
     id: UUID
-    productName: str
+    productName: str = PydanticField(..., alias="name")
     category: str
-    costPrice: float
-    salePrice: float
-    stockQuantity: int
+    costPrice: float = PydanticField(..., alias="cost_price")
+    salePrice: float = PydanticField(..., alias="sale_price")
+    stockQuantity: int = PydanticField(..., alias="stock_quantity")
     unit: str
     is_active: bool
-    created_at: datetime
-    updated_at: datetime
+    createdAt: datetime = PydanticField(..., alias="created_at")
+    updatedAt: datetime = PydanticField(..., alias="updated_at")
+
+    class Config:
+        orm_mode = True
+        allow_population_by_field_name = True
 
 # Order Models
 class OrderBase(SQLModel):
@@ -111,12 +116,16 @@ class OrderCreate(SQLModel):
 
 class OrderRead(SQLModel):
     id: UUID
-    orderNumber: str
-    leaderId: UUID
-    totalAmount: float
+    orderNumber: str = PydanticField(..., alias="order_number")
+    leaderId: UUID = PydanticField(..., alias="client_id")
+    totalAmount: float = PydanticField(..., alias="total_amount")
     status: str
-    orderDate: datetime
-    created_at: datetime
+    orderDate: datetime = PydanticField(..., alias="order_date")
+    createdAt: datetime = PydanticField(..., alias="created_at")
+
+    class Config:
+        orm_mode = True
+        allow_population_by_field_name = True
 
 # Payment Models
 class PaymentBase(SQLModel):
@@ -130,6 +139,7 @@ class Payment(PaymentBase, table=True):
     
     id: UUID = Field(default_factory=uuid4, primary_key=True)
     order_id: Optional[UUID] = Field(foreign_key="orders.id", default=None)
+    client_id: Optional[UUID] = Field(foreign_key="clients.id", default=None)
     payment_date: datetime = Field(default_factory=datetime.utcnow)
     created_at: datetime = Field(default_factory=datetime.utcnow)
     
@@ -139,15 +149,20 @@ class PaymentCreate(SQLModel):
     amount: float
     method: str
     leaderId: UUID
+    paymentDate: Optional[str] = None
     referenceNumber: Optional[str] = None
 
 class PaymentRead(SQLModel):
     id: UUID
     amount: float
-    method: str
-    paymentDate: datetime
-    leaderId: Optional[UUID] = None
-    referenceNumber: Optional[str] = None
+    method: str = PydanticField(..., alias="mode")
+    paymentDate: datetime = PydanticField(..., alias="payment_date")
+    leaderId: Optional[UUID] = PydanticField(None, alias="client_id")
+    referenceNumber: Optional[str] = PydanticField(None, alias="reference_number")
+
+    class Config:
+        orm_mode = True
+        allow_population_by_field_name = True
 
 # Expense Models
 class ExpenseBase(SQLModel):
@@ -177,9 +192,14 @@ class ExpenseRead(SQLModel):
     category: str
     amount: float
     description: str
-    expenseDate: datetime
-    paymentMethod: Optional[str]
-    referenceNumber: Optional[str]
+    expenseDate: datetime = PydanticField(..., alias="expense_date")
+    paymentMethod: Optional[str] = PydanticField(None, alias="payment_method")
+    referenceNumber: Optional[str] = PydanticField(None, alias="reference_number")
+    createdAt: datetime = PydanticField(..., alias="created_at")
+
+    class Config:
+        orm_mode = True
+        allow_population_by_field_name = True
 
 # User Model for Authentication
 class UserBase(SQLModel):
