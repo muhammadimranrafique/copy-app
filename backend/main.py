@@ -3,6 +3,7 @@ from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse
 from contextlib import asynccontextmanager
 from database import create_db_and_tables
+from models import *  # Import all models
 from config import get_settings
 
 settings = get_settings()

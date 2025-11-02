@@ -49,22 +49,40 @@ def create_order(
     current_user: User = Depends(get_current_user)
 ):
     """Create a new order."""
-    # Verify client exists
-    client_statement = select(Client).where(Client.id == order_data.client_id)
-    client = session.exec(client_statement).first()
-    
-    if not client:
+    try:
+        # Convert frontend field names to backend field names
+        order_dict = order_data.dict()
+        if 'orderNumber' in order_dict:
+            order_dict['order_number'] = order_dict.pop('orderNumber')
+        if 'leaderId' in order_dict:
+            order_dict['client_id'] = order_dict.pop('leaderId')
+        if 'totalAmount' in order_dict:
+            order_dict['total_amount'] = order_dict.pop('totalAmount')
+        
+        # Verify client exists
+        client_statement = select(Client).where(Client.id == order_dict.get('client_id'))
+        client = session.exec(client_statement).first()
+        
+        if not client:
+            raise HTTPException(
+                status_code=status.HTTP_404_NOT_FOUND,
+                detail="Leader/Client not found"
+            )
+        
+        db_order = Order(**order_dict)
+        session.add(db_order)
+        session.commit()
+        session.refresh(db_order)
+        
+        return db_order
+    except HTTPException:
+        raise
+    except Exception as e:
+        session.rollback()
         raise HTTPException(
-            status_code=status.HTTP_404_NOT_FOUND,
-            detail="Client not found"
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail=f"Failed to create order: {str(e)}"
         )
-    
-    db_order = Order(**order_data.dict())
-    session.add(db_order)
-    session.commit()
-    session.refresh(db_order)
-    
-    return db_order
 
 @router.put("/{order_id}", response_model=OrderRead)
 def update_order(

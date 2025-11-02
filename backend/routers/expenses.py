@@ -41,12 +41,28 @@ def create_expense(
     current_user: User = Depends(get_current_user)
 ):
     """Add a new expense."""
-    db_expense = Expense(**expense_data.dict())
-    session.add(db_expense)
-    session.commit()
-    session.refresh(db_expense)
-    
-    return db_expense
+    try:
+        # Convert frontend field names to backend field names
+        expense_dict = expense_data.dict()
+        if 'paymentMethod' in expense_dict:
+            expense_dict['payment_method'] = expense_dict.pop('paymentMethod')
+        if 'referenceNumber' in expense_dict:
+            expense_dict['reference_number'] = expense_dict.pop('referenceNumber')
+        if 'expenseDate' in expense_dict:
+            expense_dict['expense_date'] = expense_dict.pop('expenseDate')
+        
+        db_expense = Expense(**expense_dict)
+        session.add(db_expense)
+        session.commit()
+        session.refresh(db_expense)
+        
+        return db_expense
+    except Exception as e:
+        session.rollback()
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail=f"Failed to create expense: {str(e)}"
+        )
 
 @router.put("/{expense_id}", response_model=ExpenseRead)
 def update_expense(

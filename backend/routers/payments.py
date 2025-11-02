@@ -2,7 +2,7 @@ from fastapi import APIRouter, Depends, HTTPException, status
 from sqlmodel import Session, select
 from typing import List
 from database import get_session
-from models import Payment, PaymentCreate, PaymentRead, Order, User
+from models import Payment, PaymentCreate, PaymentRead, Order, User, PaymentStatus, PaymentMode
 from utils.auth import get_current_user
 
 router = APIRouter(prefix="/payments", tags=["Payments"])
@@ -40,22 +40,57 @@ def create_payment(
     current_user: User = Depends(get_current_user)
 ):
     """Record a new payment."""
-    # Verify order exists
-    order_statement = select(Order).where(Order.id == payment_data.order_id)
-    order = session.exec(order_statement).first()
-    
-    if not order:
+    try:
+        # Convert frontend field names to backend field names
+        payment_dict = payment_data.dict()
+        if 'orderId' in payment_dict:
+            payment_dict['order_id'] = payment_dict.pop('orderId')
+        if 'method' in payment_dict:
+            payment_dict['mode'] = payment_dict.pop('method')
+        if 'referenceNumber' in payment_dict:
+            payment_dict['reference_number'] = payment_dict.pop('referenceNumber')
+        
+        # Set default status if not provided
+        if 'status' not in payment_dict:
+            payment_dict['status'] = PaymentStatus.COMPLETED
+        
+        # For now, create a dummy order if orderId is not provided but leaderId is
+        if 'order_id' not in payment_dict and 'leaderId' in payment_data.dict():
+            # Create a simple payment record without order reference
+            payment_dict.pop('order_id', None)
+            db_payment = Payment(
+                amount=payment_dict['amount'],
+                mode=payment_dict.get('mode', PaymentMode.CASH),
+                status=PaymentStatus.COMPLETED,
+                reference_number=payment_dict.get('reference_number')
+            )
+        else:
+            # Verify order exists if order_id is provided
+            if 'order_id' in payment_dict:
+                order_statement = select(Order).where(Order.id == payment_dict['order_id'])
+                order = session.exec(order_statement).first()
+                
+                if not order:
+                    raise HTTPException(
+                        status_code=status.HTTP_404_NOT_FOUND,
+                        detail="Order not found"
+                    )
+            
+            db_payment = Payment(**payment_dict)
+        
+        session.add(db_payment)
+        session.commit()
+        session.refresh(db_payment)
+        
+        return db_payment
+    except HTTPException:
+        raise
+    except Exception as e:
+        session.rollback()
         raise HTTPException(
-            status_code=status.HTTP_404_NOT_FOUND,
-            detail="Order not found"
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail=f"Failed to create payment: {str(e)}"
         )
-    
-    db_payment = Payment(**payment_data.dict())
-    session.add(db_payment)
-    session.commit()
-    session.refresh(db_payment)
-    
-    return db_payment
 
 @router.put("/{payment_id}", response_model=PaymentRead)
 def update_payment(

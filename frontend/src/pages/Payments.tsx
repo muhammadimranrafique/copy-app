@@ -74,6 +74,11 @@ export default function Payments() {
       toast.error('Please select a leader');
       return;
     }
+    
+    if (formData.amount <= 0) {
+      toast.error('Amount must be greater than 0');
+      return;
+    }
     try {
       await createPayment(formData);
       toast.success('Payment recorded successfully');
@@ -86,8 +91,9 @@ export default function Payments() {
         referenceNumber: ''
       });
       refetchPayments();
-    } catch (error) {
-      toast.error('Failed to record payment');
+    } catch (error: any) {
+      console.error('Payment creation error:', error);
+      toast.error(error?.message || 'Failed to record payment');
     }
   };
 
