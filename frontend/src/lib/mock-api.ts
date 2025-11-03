@@ -233,7 +233,13 @@ export async function getPayments(params: any = {}) {
       leaderId: payment.leaderId || '',
       orderId: payment.orderId || undefined,
       referenceNumber: payment.referenceNumber || undefined,
-      leaderName: payment.leaderName || 'N/A'
+      client: payment.client ? {
+        id: payment.client.id,
+        name: payment.client.name,
+        type: payment.client.type,
+        contact: payment.client.contact,
+        address: payment.client.address
+      } : null
     }));
     
     return { payments: normalizedPayments };
@@ -293,13 +299,13 @@ export async function downloadPaymentReceipt(paymentId: string): Promise<void> {
   }
 
   try {
-    const token = localStorage.getItem('token');
+    const token = localStorage.getItem('access_token');
     if (!token) {
-      throw new Error('Authentication required');
+      throw new Error('Authentication required. Please log in again.');
     }
 
     if (import.meta.env.VITE_DEBUG === 'true') {
-      console.debug('[Download Receipt Request]', { paymentId });
+      console.debug('[Download Receipt Request]', { paymentId, hasToken: !!token });
     }
 
     // Make request to generate and download PDF
@@ -310,7 +316,14 @@ export async function downloadPaymentReceipt(paymentId: string): Promise<void> {
       },
     });
 
+    if (import.meta.env.VITE_DEBUG === 'true') {
+      console.debug('[Download Receipt Response]', { status: response.status, statusText: response.statusText });
+    }
+
     if (!response.ok) {
+      if (response.status === 401) {
+        throw new Error('Authentication failed. Please log in again.');
+      }
       const errorText = await response.text();
       throw new Error(`Failed to download receipt: ${errorText}`);
     }

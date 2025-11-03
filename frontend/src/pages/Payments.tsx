@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { Plus, DollarSign, Download } from 'lucide-react';
+import { Plus, DollarSign, Download, Banknote, CreditCard, Receipt, Smartphone, Building2, User, School } from 'lucide-react';
 import { useCurrency } from '@/hooks/useCurrency';
 import { useAuth } from '@/lib/useAuth';
 import { getPayments, createPayment, getLeaders, downloadPaymentReceipt } from '@/lib/mock-api';
@@ -112,14 +112,30 @@ export default function Payments() {
     }
   };
 
+  const getMethodIcon = (method?: string) => {
+    const icons: Record<string, JSX.Element> = {
+      'Cash': <Banknote className="w-4 h-4" />,
+      'Bank Transfer': <Building2 className="w-4 h-4" />,
+      'Cheque': <Receipt className="w-4 h-4" />,
+      'UPI': <Smartphone className="w-4 h-4" />
+    };
+    return icons[method || 'Cash'] || <CreditCard className="w-4 h-4" />;
+  };
+
   const getMethodBadge = (method?: string) => {
     const colors: Record<string, string> = {
-      'Cash': 'bg-green-100 text-green-700',
-      'Bank Transfer': 'bg-blue-100 text-blue-700',
-      'Cheque': 'bg-purple-100 text-purple-700',
-      'UPI': 'bg-orange-100 text-orange-700'
+      'Cash': 'bg-green-100 text-green-700 border-green-200',
+      'Bank Transfer': 'bg-blue-100 text-blue-700 border-blue-200',
+      'Cheque': 'bg-purple-100 text-purple-700 border-purple-200',
+      'UPI': 'bg-orange-100 text-orange-700 border-orange-200'
     };
-    return colors[method || 'Cash'] || 'bg-gray-100 text-gray-700';
+    return colors[method || 'Cash'] || 'bg-gray-100 text-gray-700 border-gray-200';
+  };
+
+
+
+  const formatAmount = (amount: number): string => {
+    return `Rs ${amount.toLocaleString('en-PK', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
   };
 
   const handleDownloadReceipt = async (paymentId: string) => {
@@ -168,15 +184,22 @@ export default function Payments() {
                 </Select>
               </div>
               <div>
-                <Label htmlFor="amount">Amount *</Label>
-                <Input
-                  id="amount"
-                  type="number"
-                  step="0.01"
-                  value={formData.amount}
-                  onChange={(e) => setFormData({ ...formData, amount: parseFloat(e.target.value) || 0 })}
-                  required
-                />
+                <Label htmlFor="amount">Amount (Rs) *</Label>
+                <div className="relative">
+                  <span className="absolute left-3 top-1/2 transform -translate-y-1/2 text-muted-foreground text-sm">
+                    Rs
+                  </span>
+                  <Input
+                    id="amount"
+                    type="number"
+                    step="0.01"
+                    className="pl-8"
+                    value={formData.amount}
+                    onChange={(e) => setFormData({ ...formData, amount: parseFloat(e.target.value) || 0 })}
+                    placeholder="0.00"
+                    required
+                  />
+                </div>
               </div>
               <div>
                 <Label htmlFor="method">Payment Method</Label>
@@ -224,47 +247,97 @@ export default function Payments() {
           ))}
         </div>
       ) : (
-        <div className="space-y-3 sm:space-y-4">
-          {payments.map((payment) => (
-            <Card key={payment.id} className="card-hover">
-              <CardContent className="p-4 sm:p-6">
-                <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
-                  <div className="flex items-start gap-3 sm:gap-4 flex-1">
-                    <div className="p-2 sm:p-3 rounded-full bg-green-100 flex-shrink-0">
-                      <DollarSign className="w-5 h-5 sm:w-6 sm:h-6 text-green-600" />
-                    </div>
-                    <div className="flex-1 min-w-0">
-                      <div className="flex flex-wrap items-center gap-2">
-                        <span className={`px-2 py-1 rounded text-xs font-medium ${getMethodBadge(payment.method)}`}>
-                          {payment.method}
-                        </span>
+        <div className="space-y-4">
+          {payments.map((payment) => {
+            return (
+              <Card key={payment.id} className="card-hover border-l-4 border-l-green-500 shadow-sm hover:shadow-md transition-all duration-200">
+                <CardContent className="p-6">
+                  <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-4">
+                    {/* Left Section - Client Info & Payment Details */}
+                    <div className="flex-1 space-y-3">
+                      {/* Client Name & Type */}
+                      <div className="flex items-center gap-3">
+                        <div className="flex items-center gap-2">
+                          {payment.client?.type === 'School' ? (
+                            <School className="w-5 h-5 text-blue-600" />
+                          ) : (
+                            <User className="w-5 h-5 text-gray-600" />
+                          )}
+                          <h3 className="text-lg font-semibold text-gray-900">
+                            {payment.client?.name || 'Unknown Client'}
+                          </h3>
+                        </div>
+                        <Badge variant="outline" className="text-xs">
+                          {payment.client?.type || 'N/A'}
+                        </Badge>
+                      </div>
+
+                      {/* RECEIVED FROM Section */}
+                      {payment.client && (
+                        <div className="bg-gray-50 p-3 rounded-lg border">
+                          <h4 className="text-sm font-medium text-gray-700 mb-2">RECEIVED FROM:</h4>
+                          <div className="space-y-1 text-sm text-gray-600">
+                            <div className="flex items-center gap-2">
+                              <User className="w-3 h-3" />
+                              <span>{payment.client.name}</span>
+                            </div>
+                            <div className="flex items-center gap-2">
+                              <span className="w-3 h-3 text-center">📞</span>
+                              <span>{payment.client.contact}</span>
+                            </div>
+                            <div className="flex items-center gap-2">
+                              <span className="w-3 h-3 text-center">📍</span>
+                              <span>{payment.client.address}</span>
+                            </div>
+                          </div>
+                        </div>
+                      )}
+
+                      {/* Payment Method & Reference */}
+                      <div className="flex flex-wrap items-center gap-3">
+                        <div className={`flex items-center gap-2 px-3 py-1.5 rounded-lg border ${getMethodBadge(payment.method)}`}>
+                          {getMethodIcon(payment.method)}
+                          <span className="text-sm font-medium">{payment.method}</span>
+                        </div>
                         {payment.referenceNumber && (
-                          <span className="text-xs sm:text-sm text-muted-foreground truncate">Ref: {payment.referenceNumber}</span>
+                          <div className="flex items-center gap-1 text-sm text-muted-foreground">
+                            <Receipt className="w-3 h-3" />
+                            <span>Ref: {payment.referenceNumber}</span>
+                          </div>
                         )}
                       </div>
-                      <p className="text-xs sm:text-sm text-muted-foreground mt-1">
-                        {payment.paymentDate ? format(new Date(payment.paymentDate), 'MMM dd, yyyy') : 'N/A'}
+
+                      {/* Payment Date */}
+                      <p className="text-sm text-muted-foreground">
+                        Payment Date: {payment.paymentDate ? format(new Date(payment.paymentDate), 'MMMM dd, yyyy') : 'N/A'}
                       </p>
                     </div>
-                  </div>
-                  <div className="flex items-center gap-3">
-                    <div className="text-left sm:text-right">
-                      <p className="text-xl sm:text-2xl font-bold text-green-600">{formatCurrency(payment.amount || 0)}</p>
+
+                    {/* Right Section - Amount & Actions */}
+                    <div className="flex items-center gap-4 lg:flex-col lg:items-end">
+                      <div className="text-right">
+                        <p className="text-2xl font-bold text-green-600">
+                          {formatAmount(payment.amount || 0)}
+                        </p>
+                        <p className="text-xs text-muted-foreground mt-1">
+                          Payment Amount
+                        </p>
+                      </div>
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        onClick={() => handleDownloadReceipt(payment.id)}
+                        className="flex items-center gap-2 hover:bg-green-50 hover:border-green-300"
+                      >
+                        <Download className="w-4 h-4" />
+                        <span className="hidden sm:inline">Receipt</span>
+                      </Button>
                     </div>
-                    <Button
-                      variant="outline"
-                      size="icon"
-                      onClick={() => handleDownloadReceipt(payment.id)}
-                      title="Download Receipt"
-                      className="flex-shrink-0"
-                    >
-                      <Download className="w-4 h-4" />
-                    </Button>
                   </div>
-                </div>
-              </CardContent>
-            </Card>
-          ))}
+                </CardContent>
+              </Card>
+            );
+          })}
         </div>
       )}
 

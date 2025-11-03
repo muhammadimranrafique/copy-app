@@ -27,6 +27,14 @@ export interface Product {
   unit?: string;
 }
 
+export interface ClientInfo {
+  id: string;
+  name: string;
+  type: string;
+  contact: string;
+  address: string;
+}
+
 export interface Payment {
   id: string;
   amount: number;
@@ -37,7 +45,7 @@ export interface Payment {
   leaderId: string;
   orderId?: string;
   referenceNumber?: string;
-  leaderName?: string;
+  client?: ClientInfo | null;
 }
 
 export interface PaymentCreate {
