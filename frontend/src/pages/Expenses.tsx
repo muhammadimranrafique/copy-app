@@ -214,21 +214,21 @@ export default function Expenses() {
   };
 
   return (
-    <div className="space-y-6">
+    <div className="p-4 sm:p-6 lg:p-8 space-y-4 sm:space-y-6">
       {/* Header */}
-      <div className="flex justify-between items-center">
+      <div className="flex flex-col sm:flex-row justify-between sm:items-center gap-3 sm:gap-0">
         <div>
-          <h1 className="text-3xl font-bold text-gray-900">Expenses</h1>
-          <p className="text-gray-600 mt-1">Track daily expenses during copy production</p>
+          <h1 className="text-2xl sm:text-3xl font-bold text-gray-900">Expenses</h1>
+          <p className="text-sm sm:text-base text-gray-600 mt-1">Track daily expenses during copy production</p>
         </div>
         <Dialog open={dialogOpen} onOpenChange={handleDialogClose}>
           <DialogTrigger asChild>
-            <Button className="flex items-center gap-2">
+            <Button className="flex items-center gap-2 w-full sm:w-auto">
               <Plus className="h-4 w-4" />
               Add Expense
             </Button>
           </DialogTrigger>
-          <DialogContent className="max-w-md">
+          <DialogContent className="max-w-[95vw] sm:max-w-md max-h-[90vh] overflow-y-auto">
             <DialogHeader>
               <DialogTitle>{editingExpense ? 'Edit Expense' : 'Add New Expense'}</DialogTitle>
             </DialogHeader>
@@ -325,9 +325,9 @@ export default function Expenses() {
       </div>
 
       {/* Filters */}
-      <div className="flex flex-wrap gap-4">
-        <div className="flex-1 min-w-[200px]">
-          <Label htmlFor="filterCategory">Filter by Category</Label>
+      <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 sm:gap-4">
+        <div>
+          <Label htmlFor="filterCategory" className="text-sm">Filter by Category</Label>
           <Select value={filterCategory} onValueChange={setFilterCategory}>
             <SelectTrigger>
               <SelectValue />
@@ -343,8 +343,8 @@ export default function Expenses() {
           </Select>
         </div>
         
-        <div className="flex-1 min-w-[150px]">
-          <Label htmlFor="startDate">Start Date</Label>
+        <div>
+          <Label htmlFor="startDate" className="text-sm">Start Date</Label>
           <Input
             id="startDate"
             type="date"
@@ -353,8 +353,8 @@ export default function Expenses() {
           />
         </div>
         
-        <div className="flex-1 min-w-[150px]">
-          <Label htmlFor="endDate">End Date</Label>
+        <div>
+          <Label htmlFor="endDate" className="text-sm">End Date</Label>
           <Input
             id="endDate"
             type="date"
@@ -365,62 +365,63 @@ export default function Expenses() {
       </div>
 
       {/* Summary Card */}
-      <Card>
-        <CardContent className="p-6">
-          <div className="flex items-center justify-between">
+      <Card className="card-hover">
+        <CardContent className="p-4 sm:p-6">
+          <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3 sm:gap-0">
             <div>
-              <p className="text-sm text-gray-600">Total Expenses</p>
-              <p className="text-2xl font-bold text-red-600">{formatCurrency(totalExpenses)}</p>
+              <p className="text-xs sm:text-sm text-gray-600">Total Expenses</p>
+              <p className="text-xl sm:text-2xl font-bold text-red-600">{formatCurrency(totalExpenses)}</p>
             </div>
-            <div className="text-right">
-              <p className="text-sm text-gray-600">Filtered Results</p>
-              <p className="text-lg font-semibold">{filteredExpenses.length} expenses</p>
+            <div className="text-left sm:text-right">
+              <p className="text-xs sm:text-sm text-gray-600">Filtered Results</p>
+              <p className="text-base sm:text-lg font-semibold">{filteredExpenses.length} expenses</p>
             </div>
           </div>
         </CardContent>
       </Card>
 
       {/* Expenses List */}
-      <div className="space-y-4">
+      <div className="space-y-3 sm:space-y-4">
         {filteredExpenses.map((expense) => (
-          <Card key={expense.id}>
-            <CardContent className="p-6">
-              <div className="flex items-start justify-between">
-                <div className="flex-1">
-                  <div className="flex items-center gap-2 mb-2">
-                    <Receipt className="h-4 w-4 text-gray-500" />
-                    <Badge className={getCategoryBadge(expense.category)}>
+          <Card key={expense.id} className="card-hover">
+            <CardContent className="p-4 sm:p-6">
+              <div className="flex flex-col lg:flex-row items-start justify-between gap-4">
+                <div className="flex-1 min-w-0">
+                  <div className="flex flex-wrap items-center gap-2 mb-2">
+                    <Receipt className="h-4 w-4 text-gray-500 flex-shrink-0" />
+                    <Badge className={`${getCategoryBadge(expense.category)} text-xs`}>
                       {expense.category}
                     </Badge>
                     {expense.paymentMethod && (
-                      <Badge variant="outline" className={getPaymentMethodBadge(expense.paymentMethod)}>
+                      <Badge variant="outline" className={`${getPaymentMethodBadge(expense.paymentMethod)} text-xs`}>
                         {expense.paymentMethod}
                       </Badge>
                     )}
                   </div>
                   
-                  <h3 className="font-semibold text-lg mb-1">{expense.description}</h3>
+                  <h3 className="font-semibold text-base sm:text-lg mb-1 break-words">{expense.description}</h3>
                   
-                  <div className="flex items-center gap-4 text-sm text-gray-600">
+                  <div className="flex flex-wrap items-center gap-2 sm:gap-4 text-xs sm:text-sm text-gray-600">
                     <span>Date: {format(new Date(expense.expenseDate), 'MMM dd, yyyy')}</span>
                     {expense.referenceNumber && (
-                      <span>Ref: {expense.referenceNumber}</span>
+                      <span className="truncate">Ref: {expense.referenceNumber}</span>
                     )}
                   </div>
                 </div>
                 
-                <div className="flex items-center gap-3">
-                  <div className="text-right">
-                    <p className="text-2xl font-bold text-red-600">
+                <div className="flex items-center justify-between lg:justify-end gap-3 w-full lg:w-auto">
+                  <div className="text-left lg:text-right">
+                    <p className="text-xl sm:text-2xl font-bold text-red-600">
                       {formatCurrency(expense.amount)}
                     </p>
                   </div>
                   
-                  <div className="flex gap-2">
+                  <div className="flex gap-2 flex-shrink-0">
                     <Button 
                       variant="outline" 
                       size="sm"
                       onClick={() => handleEdit(expense)}
+                      className="h-9 w-9 p-0"
                     >
                       <Edit className="h-4 w-4" />
                     </Button>
@@ -428,7 +429,7 @@ export default function Expenses() {
                       variant="outline" 
                       size="sm" 
                       onClick={() => handleDelete(expense.id)}
-                      className="text-red-600 hover:text-red-700"
+                      className="text-red-600 hover:text-red-700 h-9 w-9 p-0"
                     >
                       <Trash2 className="h-4 w-4" />
                     </Button>

@@ -1,4 +1,5 @@
 from fastapi import APIRouter, Depends, HTTPException, status
+from fastapi.responses import FileResponse
 from sqlmodel import Session, select
 from typing import List
 from datetime import datetime
@@ -6,6 +7,8 @@ from database import get_session
 from models import Payment, PaymentCreate, PaymentRead, Order, User, PaymentStatus, PaymentMode, Client
 from utils.auth import get_current_user
 from sqlalchemy.orm import joinedload
+from services.payment_receipt_generator import payment_receipt_generator
+import os
 
 router = APIRouter(prefix="/payments", tags=["Payments"])
 
@@ -209,4 +212,98 @@ def get_payments_by_school(school_id: str, session: Session = Depends(get_sessio
     # For now, returning all payments
     payments = session.exec(select(Payment)).all()
     return payments
+
+@router.post("/{payment_id}/receipt")
+def generate_payment_receipt(
+    payment_id: str,
+    session: Session = Depends(get_session),
+    current_user: User = Depends(get_current_user)
+):
+    """
+    Generate a professional PDF receipt for a payment.
+
+    This endpoint creates a beautifully formatted payment receipt with:
+    - Company branding and header
+    - Payment details (amount, method, date, reference)
+    - Client/Leader information
+    - QR code for verification
+    - Professional footer with page numbers
+
+    Returns the PDF file for download.
+    """
+    try:
+        # Get payment from database
+        statement = select(Payment).where(Payment.id == payment_id)
+        payment = session.exec(statement).first()
+
+        if not payment:
+            raise HTTPException(
+                status_code=status.HTTP_404_NOT_FOUND,
+                detail=f"Payment not found with ID: {payment_id}"
+            )
+
+        # Get client/leader information
+        client_statement = select(Client).where(Client.id == payment.client_id)
+        client = session.exec(client_statement).first()
+
+        if not client:
+            raise HTTPException(
+                status_code=status.HTTP_404_NOT_FOUND,
+                detail="Client/Leader not found for this payment"
+            )
+
+        # Prepare payment data for PDF generation
+        payment_data = {
+            "payment_id": str(payment.id),
+            "amount": float(payment.amount),
+            "method": payment.mode.value if hasattr(payment.mode, 'value') else str(payment.mode),
+            "status": payment.status.value if hasattr(payment.status, 'value') else str(payment.status),
+            "payment_date": payment.payment_date.isoformat() if payment.payment_date else datetime.utcnow().isoformat(),
+            "reference_number": payment.reference_number if payment.reference_number else "",
+        }
+
+        # Prepare client data for PDF generation
+        client_data = {
+            "name": client.name,
+            "type": client.type.value if hasattr(client.type, 'value') else str(client.type),
+            "contact": client.contact,
+            "address": client.address,
+        }
+
+        print(f"Generating receipt for payment {payment_id}")
+        print(f"Payment data: {payment_data}")
+        print(f"Client data: {client_data}")
+
+        # Generate the PDF receipt
+        receipt_path = payment_receipt_generator.generate_receipt(payment_data, client_data)
+
+        if not os.path.exists(receipt_path):
+            raise HTTPException(
+                status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+                detail="Failed to generate payment receipt PDF"
+            )
+
+        print(f"Receipt generated successfully at: {receipt_path}")
+
+        # Return the PDF file
+        return FileResponse(
+            receipt_path,
+            media_type='application/pdf',
+            filename=os.path.basename(receipt_path),
+            headers={
+                "Content-Disposition": f"attachment; filename={os.path.basename(receipt_path)}"
+            }
+        )
+
+    except HTTPException as he:
+        print(f"HTTP Exception in receipt generation: {str(he)}")
+        raise
+    except Exception as e:
+        print(f"Error generating payment receipt: {str(e)}")
+        import traceback
+        traceback.print_exc()
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail=f"Failed to generate payment receipt: {str(e)}"
+        )
 

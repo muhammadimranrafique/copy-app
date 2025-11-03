@@ -80,20 +80,20 @@ export default function Products() {
   };
 
   return (
-    <div className="p-8 space-y-6">
-      <div className="flex items-center justify-between">
+    <div className="p-4 sm:p-6 lg:p-8 space-y-4 sm:space-y-6">
+      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 sm:gap-0">
         <div>
-          <h1 className="text-3xl font-bold">Products</h1>
-          <p className="text-muted-foreground">Manage your product inventory</p>
+          <h1 className="text-2xl sm:text-3xl font-bold">Products</h1>
+          <p className="text-sm sm:text-base text-muted-foreground">Manage your product inventory</p>
         </div>
         <Dialog open={dialogOpen} onOpenChange={setDialogOpen}>
           <DialogTrigger asChild>
-            <Button>
+            <Button className="w-full sm:w-auto">
               <Plus className="w-4 h-4 mr-2" />
               Add Product
             </Button>
           </DialogTrigger>
-          <DialogContent>
+          <DialogContent className="max-w-[95vw] sm:max-w-[425px] max-h-[90vh] overflow-y-auto">
             <DialogHeader>
               <DialogTitle>Add New Product</DialogTitle>
             </DialogHeader>
@@ -165,49 +165,49 @@ export default function Products() {
       </div>
 
       {loading ? (
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4">
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-3 sm:gap-4">
           {[1, 2, 3, 4].map((i) => (
             <div key={i} className="h-56 bg-muted rounded-lg animate-pulse"></div>
           ))}
         </div>
       ) : (
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4">
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-3 sm:gap-4">
           {products.map((product) => {
             const profit = (product.salePrice || 0) - (product.costPrice || 0);
             const profitMargin = product.costPrice ? ((profit / product.costPrice) * 100).toFixed(1) : 0;
             
             return (
-              <Card key={product.id}>
-                <CardHeader>
-                  <div className="flex items-start justify-between">
-                    <div className="flex items-center gap-2">
-                      <Package className="w-5 h-5 text-primary" />
-                      <CardTitle className="text-lg">{product.productName}</CardTitle>
+              <Card key={product.id} className="card-hover">
+                <CardHeader className="pb-3">
+                  <div className="flex items-start justify-between gap-2">
+                    <div className="flex items-center gap-2 flex-1 min-w-0">
+                      <Package className="w-4 h-4 sm:w-5 sm:h-5 text-primary flex-shrink-0" />
+                      <CardTitle className="text-base sm:text-lg truncate">{product.productName}</CardTitle>
                     </div>
                   </div>
                   {product.category && (
-                    <Badge variant="outline" className="w-fit">{product.category}</Badge>
+                    <Badge variant="outline" className="w-fit text-xs">{product.category}</Badge>
                   )}
                 </CardHeader>
-                <CardContent className="space-y-3">
+                <CardContent className="space-y-2 sm:space-y-3 pt-3">
                   <div className="grid grid-cols-2 gap-2">
                     <div>
                       <p className="text-xs text-muted-foreground">Cost Price</p>
-                      <p className="font-medium">{formatCurrency(product.costPrice || 0)}</p>
+                      <p className="font-medium text-sm sm:text-base truncate">{formatCurrency(product.costPrice || 0)}</p>
                     </div>
                     <div>
                       <p className="text-xs text-muted-foreground">Sale Price</p>
-                      <p className="font-medium text-green-600">{formatCurrency(product.salePrice || 0)}</p>
+                      <p className="font-medium text-sm sm:text-base text-green-600 truncate">{formatCurrency(product.salePrice || 0)}</p>
                     </div>
                   </div>
                   <div className="grid grid-cols-2 gap-2">
                     <div>
                       <p className="text-xs text-muted-foreground">Stock</p>
-                      <p className="font-semibold">{product.stockQuantity || 0} {product.unit}</p>
+                      <p className="font-semibold text-sm sm:text-base truncate">{product.stockQuantity || 0} {product.unit}</p>
                     </div>
                     <div>
                       <p className="text-xs text-muted-foreground">Margin</p>
-                      <p className="font-semibold text-blue-600">{profitMargin}%</p>
+                      <p className="font-semibold text-sm sm:text-base text-blue-600">{profitMargin}%</p>
                     </div>
                   </div>
                 </CardContent>

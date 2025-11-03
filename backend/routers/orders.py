@@ -58,14 +58,15 @@ def get_orders(
         response_orders = []
         for order in orders:
             try:
+                # Create OrderRead using field names that match the model definition
                 order_data = OrderRead(
                     id=order.id,
-                    order_number=order.order_number,
-                    client_id=order.client_id,
-                    total_amount=order.total_amount,
+                    orderNumber=order.order_number,  # Use the frontend field name
+                    leaderId=order.client_id,        # Use the frontend field name
+                    totalAmount=order.total_amount,  # Use the frontend field name
                     status=order.status.value if isinstance(order.status, OrderStatus) else str(order.status),
-                    order_date=order.order_date,
-                    created_at=order.created_at,
+                    orderDate=order.order_date,      # Use the frontend field name
+                    createdAt=order.created_at,      # Use the frontend field name
                     leaderName=order.client.name if order.client else None
                 )
                 response_orders.append(order_data)

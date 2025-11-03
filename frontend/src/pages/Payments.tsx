@@ -1,8 +1,8 @@
 import { useState } from 'react';
-import { Plus, DollarSign } from 'lucide-react';
+import { Plus, DollarSign, Download } from 'lucide-react';
 import { useCurrency } from '@/hooks/useCurrency';
 import { useAuth } from '@/lib/useAuth';
-import { getPayments, createPayment, getLeaders } from '@/lib/mock-api';
+import { getPayments, createPayment, getLeaders, downloadPaymentReceipt } from '@/lib/mock-api';
 import { useAuthenticatedQuery } from '@/hooks/useAuthenticatedQuery';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -122,21 +122,32 @@ export default function Payments() {
     return colors[method || 'Cash'] || 'bg-gray-100 text-gray-700';
   };
 
+  const handleDownloadReceipt = async (paymentId: string) => {
+    try {
+      toast.loading('Generating receipt...', { id: 'download-receipt' });
+      await downloadPaymentReceipt(paymentId);
+      toast.success('Receipt downloaded successfully', { id: 'download-receipt' });
+    } catch (error: any) {
+      console.error('Receipt download error:', error);
+      toast.error(error?.message || 'Failed to download receipt', { id: 'download-receipt' });
+    }
+  };
+
   return (
-    <div className="p-8 space-y-6">
-      <div className="flex items-center justify-between">
+    <div className="p-4 sm:p-6 lg:p-8 space-y-4 sm:space-y-6">
+      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 sm:gap-0">
         <div>
-          <h1 className="text-3xl font-bold">Payments</h1>
-          <p className="text-muted-foreground">Manage customer payments</p>
+          <h1 className="text-2xl sm:text-3xl font-bold">Payments</h1>
+          <p className="text-sm sm:text-base text-muted-foreground">Manage customer payments</p>
         </div>
         <Dialog open={dialogOpen} onOpenChange={setDialogOpen}>
           <DialogTrigger asChild>
-            <Button>
+            <Button className="w-full sm:w-auto">
               <Plus className="w-4 h-4 mr-2" />
               Record Payment
             </Button>
           </DialogTrigger>
-          <DialogContent>
+          <DialogContent className="max-w-[95vw] sm:max-w-[425px] max-h-[90vh] overflow-y-auto">
             <DialogHeader>
               <DialogTitle>Record New Payment</DialogTitle>
             </DialogHeader>
@@ -207,37 +218,48 @@ export default function Payments() {
       </div>
 
       {loading ? (
-        <div className="space-y-4">
+        <div className="space-y-3 sm:space-y-4">
           {[1, 2, 3].map((i) => (
-            <div key={i} className="h-24 bg-muted rounded-lg animate-pulse"></div>
+            <div key={i} className="h-24 sm:h-28 bg-muted rounded-lg animate-pulse"></div>
           ))}
         </div>
       ) : (
-        <div className="space-y-4">
+        <div className="space-y-3 sm:space-y-4">
           {payments.map((payment) => (
-            <Card key={payment.id}>
-              <CardContent className="p-6">
-                <div className="flex items-center justify-between">
-                  <div className="flex items-center gap-4">
-                    <div className="p-3 rounded-full bg-green-100">
-                      <DollarSign className="w-6 h-6 text-green-600" />
+            <Card key={payment.id} className="card-hover">
+              <CardContent className="p-4 sm:p-6">
+                <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+                  <div className="flex items-start gap-3 sm:gap-4 flex-1">
+                    <div className="p-2 sm:p-3 rounded-full bg-green-100 flex-shrink-0">
+                      <DollarSign className="w-5 h-5 sm:w-6 sm:h-6 text-green-600" />
                     </div>
-                    <div>
-                      <div className="flex items-center gap-2">
+                    <div className="flex-1 min-w-0">
+                      <div className="flex flex-wrap items-center gap-2">
                         <span className={`px-2 py-1 rounded text-xs font-medium ${getMethodBadge(payment.method)}`}>
                           {payment.method}
                         </span>
                         {payment.referenceNumber && (
-                          <span className="text-sm text-muted-foreground">Ref: {payment.referenceNumber}</span>
+                          <span className="text-xs sm:text-sm text-muted-foreground truncate">Ref: {payment.referenceNumber}</span>
                         )}
                       </div>
-                      <p className="text-sm text-muted-foreground mt-1">
+                      <p className="text-xs sm:text-sm text-muted-foreground mt-1">
                         {payment.paymentDate ? format(new Date(payment.paymentDate), 'MMM dd, yyyy') : 'N/A'}
                       </p>
                     </div>
                   </div>
-                  <div className="text-right">
-                    <p className="text-2xl font-bold text-green-600">{formatCurrency(payment.amount || 0)}</p>
+                  <div className="flex items-center gap-3">
+                    <div className="text-left sm:text-right">
+                      <p className="text-xl sm:text-2xl font-bold text-green-600">{formatCurrency(payment.amount || 0)}</p>
+                    </div>
+                    <Button
+                      variant="outline"
+                      size="icon"
+                      onClick={() => handleDownloadReceipt(payment.id)}
+                      title="Download Receipt"
+                      className="flex-shrink-0"
+                    >
+                      <Download className="w-4 h-4" />
+                    </Button>
                   </div>
                 </div>
               </CardContent>

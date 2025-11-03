@@ -143,7 +143,7 @@ export async function getOrders(params: any) {
     // Ensure all required fields are present and properly formatted
     const normalizedOrders = orders.map((order: any) => ({
       id: order.id || '',
-      orderNumber: order.orderNumber || 'N/A',
+      orderNumber: order.orderNumber || order.order_number || 'N/A',
       leaderId: order.leaderId || order.client_id || '',
       leaderName: order.leaderName || 'N/A',
       totalAmount: Number(order.totalAmount || order.total_amount || 0),
@@ -248,13 +248,13 @@ export async function createPayment(data: any) {
     await new Promise(r => setTimeout(r, 300));
     return { success: true, payment: { id: Date.now().toString(), ...data } };
   }
-  
+
   try {
     // Validate required fields
     if (!data.amount || !data.method || !data.leaderId) {
       throw new Error('Missing required fields: amount, method, and leaderId are required');
     }
-    
+
     // Format the payment data for the API
     const paymentData = {
       amount: Number(data.amount),
@@ -269,18 +269,81 @@ export async function createPayment(data: any) {
       console.debug('[Payment Request]', paymentData);
     }
 
-    const res = await fetchJSON('/payments/', { 
-      method: 'POST', 
+    const res = await fetchJSON('/payments/', {
+      method: 'POST',
       body: JSON.stringify(paymentData)
     });
-    
+
     if (import.meta.env.VITE_DEBUG === 'true') {
       console.debug('[Payment Response]', res);
     }
-    
+
     return { success: true, payment: res };
   } catch (error) {
     console.error('[Create Payment Error]', error);
+    throw error;
+  }
+}
+
+export async function downloadPaymentReceipt(paymentId: string): Promise<void> {
+  if (USE_MOCK) {
+    await new Promise(r => setTimeout(r, 500));
+    console.log('Mock: Would download receipt for payment', paymentId);
+    return;
+  }
+
+  try {
+    const token = localStorage.getItem('token');
+    if (!token) {
+      throw new Error('Authentication required');
+    }
+
+    if (import.meta.env.VITE_DEBUG === 'true') {
+      console.debug('[Download Receipt Request]', { paymentId });
+    }
+
+    // Make request to generate and download PDF
+    const response = await fetch(`${API_BASE}/payments/${paymentId}/receipt`, {
+      method: 'POST',
+      headers: {
+        'Authorization': `Bearer ${token}`,
+      },
+    });
+
+    if (!response.ok) {
+      const errorText = await response.text();
+      throw new Error(`Failed to download receipt: ${errorText}`);
+    }
+
+    // Get the filename from Content-Disposition header or use default
+    const contentDisposition = response.headers.get('Content-Disposition');
+    let filename = `payment_receipt_${paymentId}.pdf`;
+
+    if (contentDisposition) {
+      const filenameMatch = contentDisposition.match(/filename="?(.+)"?/);
+      if (filenameMatch) {
+        filename = filenameMatch[1];
+      }
+    }
+
+    // Convert response to blob and trigger download
+    const blob = await response.blob();
+    const url = window.URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = filename;
+    document.body.appendChild(a);
+    a.click();
+
+    // Cleanup
+    window.URL.revokeObjectURL(url);
+    document.body.removeChild(a);
+
+    if (import.meta.env.VITE_DEBUG === 'true') {
+      console.debug('[Download Receipt Success]', { filename });
+    }
+  } catch (error) {
+    console.error('[Download Receipt Error]', error);
     throw error;
   }
 }
@@ -302,9 +365,19 @@ export async function getDashboardData(params: any) {
       recentPayments: mockPayments.slice(0, 5)
     };
   }
-  const qs = params && Object.keys(params).length ? `?${new URLSearchParams(params).toString()}` : '';
-  const res = await fetchJSON(`/dashboard/${qs}`);
-  return res;
+  try {
+    const qs = params && Object.keys(params).length ? `?${new URLSearchParams(params).toString()}` : '';
+    const res = await fetchJSON(`/dashboard/stats${qs}`);
+    
+    if (import.meta.env.VITE_DEBUG === 'true') {
+      console.debug('[Dashboard Response]', res);
+    }
+    
+    return res;
+  } catch (error) {
+    console.error('[Dashboard API Error]', error);
+    throw error;
+  }
 }
 
 export async function getExpenses(params: any) {

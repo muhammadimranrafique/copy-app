@@ -114,20 +114,20 @@ export default function Orders() {
   };
 
   return (
-    <div className="p-8 space-y-6">
-      <div className="flex items-center justify-between">
+    <div className="p-4 sm:p-6 lg:p-8 space-y-4 sm:space-y-6">
+      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 sm:gap-0">
         <div>
-          <h1 className="text-3xl font-bold">Orders</h1>
-          <p className="text-muted-foreground">Manage customer orders</p>
+          <h1 className="text-2xl sm:text-3xl font-bold">Orders</h1>
+          <p className="text-sm sm:text-base text-muted-foreground">Manage customer orders</p>
         </div>
         <Dialog open={dialogOpen} onOpenChange={setDialogOpen}>
           <DialogTrigger asChild>
-            <Button>
+            <Button className="w-full sm:w-auto">
               <Plus className="w-4 h-4 mr-2" />
               Create Order
             </Button>
           </DialogTrigger>
-          <DialogContent>
+          <DialogContent className="max-w-[95vw] sm:max-w-[425px] max-h-[90vh] overflow-y-auto">
             <DialogHeader>
               <DialogTitle>Create New Order</DialogTitle>
             </DialogHeader>
@@ -199,37 +199,37 @@ export default function Orders() {
       </div>
 
       {loading ? (
-        <div className="space-y-4">
+        <div className="space-y-3 sm:space-y-4">
           {[1, 2, 3].map((i) => (
-            <div key={i} className="h-24 bg-muted rounded-lg animate-pulse"></div>
+            <div key={i} className="h-24 sm:h-28 bg-muted rounded-lg animate-pulse"></div>
           ))}
         </div>
       ) : (
-        <div className="space-y-4">
+        <div className="space-y-3 sm:space-y-4">
           {orders.map((order) => (
-            <Card key={order.id}>
-              <CardContent className="p-6">
-                <div className="flex items-center justify-between">
-                  <div className="flex items-center gap-4">
-                    <div className="p-3 rounded-full bg-primary/10">
-                      <ShoppingCart className="w-6 h-6 text-primary" />
+            <Card key={order.id} className="card-hover">
+              <CardContent className="p-4 sm:p-6">
+                <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+                  <div className="flex items-start gap-3 sm:gap-4 flex-1">
+                    <div className="p-2 sm:p-3 rounded-full bg-primary/10 flex-shrink-0">
+                      <ShoppingCart className="w-5 h-5 sm:w-6 sm:h-6 text-primary" />
                     </div>
-                    <div>
-                      <h3 className="font-semibold text-lg">{order.orderNumber !== 'N/A' ? `Order #${order.orderNumber}` : order.orderNumber}</h3>
-                      <p className="text-sm text-muted-foreground">
+                    <div className="flex-1 min-w-0">
+                      <h3 className="font-semibold text-base sm:text-lg truncate">{order.orderNumber !== 'N/A' ? `Order #${order.orderNumber}` : order.orderNumber}</h3>
+                      <p className="text-xs sm:text-sm text-muted-foreground">
                         {order.orderDate ? format(new Date(order.orderDate), 'MMM dd, yyyy') : 'N/A'}
                       </p>
-                      <p className="text-sm text-muted-foreground mt-1">
+                      <p className="text-xs sm:text-sm text-muted-foreground mt-1 truncate">
                         Leader: {order.leaderName || 'N/A'}
                       </p>
                     </div>
                   </div>
-                  <div className="flex items-center gap-4">
-                    <div className="text-right">
-                      <p className="text-sm text-muted-foreground">Amount</p>
-                      <p className="text-xl font-bold">{formatCurrency(order.totalAmount)}</p>
+                  <div className="flex items-center justify-between sm:justify-end gap-3 sm:gap-4 w-full sm:w-auto">
+                    <div className="text-left sm:text-right">
+                      <p className="text-xs sm:text-sm text-muted-foreground">Amount</p>
+                      <p className="text-lg sm:text-xl font-bold">{formatCurrency(order.totalAmount)}</p>
                     </div>
-                    <Badge variant={getStatusColor(order.status)}>
+                    <Badge variant={getStatusColor(order.status)} className="text-xs flex-shrink-0">
                       {order.status || 'Pending'}
                     </Badge>
                   </div>
