@@ -29,16 +29,41 @@ export interface Product {
 
 export interface Payment {
   id: string;
-  amount?: number;
-  method?: string;
-  paymentDate?: string;
-  leaderId?: string;
+  amount: number;
+  method: string;
+  status: string;
+  paymentDate: string;
+  createdAt: string;
+  leaderId: string;
+  orderId?: string;
   referenceNumber?: string;
+  leaderName?: string;
 }
+
+export interface PaymentCreate {
+  amount: number;
+  method: string;
+  leaderId: string;
+  paymentDate?: string;
+  referenceNumber?: string;
+  orderId?: string;
+}
+
+export type ExpenseCategory = 'MATERIAL' | 'STAFF' | 'UTILITIES' | 'PRINTING' | 'DELIVERY' | 'MISC';
 
 export interface Expense {
   id: string;
-  category: string;
+  category: ExpenseCategory;
+  amount: number;
+  description: string;
+  expenseDate: string;
+  paymentMethod?: string;
+  referenceNumber?: string;
+  createdAt?: string;
+}
+
+export interface ExpenseCreate {
+  category: ExpenseCategory;
   amount: number;
   description: string;
   expenseDate: string;

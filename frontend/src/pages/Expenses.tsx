@@ -16,23 +16,15 @@ import { Badge } from '@/components/ui/badge';
 import { format } from 'date-fns';
 import { Textarea } from '@/components/ui/textarea';
 import { LoadingSpinner } from '@/components/LoadingSpinner';
+import type { Expense, ExpenseCategory, ExpenseCreate } from '@/lib/api-types';
 
-interface Expense {
-  id: string;
-  category: string;
-  amount: number;
-  description: string;
-  expenseDate: string;
-  paymentMethod?: string;
-  referenceNumber?: string;
-}
-
-const EXPENSE_CATEGORIES = [
-  'Materials',
-  'Labor',
-  'Utilities',
-  'Transportation',
-  'Other'
+const EXPENSE_CATEGORIES: ExpenseCategory[] = [
+  'MATERIAL',
+  'STAFF', 
+  'UTILITIES',
+  'PRINTING',
+  'DELIVERY',
+  'MISC'
 ];
 
 const PAYMENT_METHODS = [
@@ -49,8 +41,8 @@ export default function Expenses() {
   const { formatCurrency } = useCurrency();
   const { user, isLoading: authLoading } = useAuth();
   
-  const [formData, setFormData] = useState({
-    category: 'Materials',
+  const [formData, setFormData] = useState<ExpenseCreate>({
+    category: 'MATERIAL',
     amount: 0,
     description: '',
     expenseDate: new Date().toISOString().split('T')[0],
@@ -135,7 +127,7 @@ export default function Expenses() {
       toast.success('Expense added successfully');
       setDialogOpen(false);
       setFormData({
-        category: 'Materials',
+        category: 'MATERIAL',
         amount: 0,
         description: '',
         expenseDate: new Date().toISOString().split('T')[0],
@@ -166,11 +158,12 @@ export default function Expenses() {
 
   const getCategoryBadge = (category: string) => {
     const colors: Record<string, string> = {
-      'Materials': 'bg-blue-100 text-blue-700',
-      'Labor': 'bg-green-100 text-green-700',
-      'Utilities': 'bg-yellow-100 text-yellow-700',
-      'Transportation': 'bg-purple-100 text-purple-700',
-      'Other': 'bg-gray-100 text-gray-700'
+      'MATERIAL': 'bg-blue-100 text-blue-700',
+      'STAFF': 'bg-green-100 text-green-700', 
+      'UTILITIES': 'bg-yellow-100 text-yellow-700',
+      'PRINTING': 'bg-purple-100 text-purple-700',
+      'DELIVERY': 'bg-orange-100 text-orange-700',
+      'MISC': 'bg-gray-100 text-gray-700'
     };
     return colors[category] || 'bg-gray-100 text-gray-700';
   };
