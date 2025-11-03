@@ -31,7 +31,7 @@ def test_expense_categories():
     
     # Test each category
     for category in ExpenseCategory:
-        print(f"  ✅ {category.name} = '{category.value}'")
+        print(f"  [OK] {category.name} = '{category.value}'")
     
     print(f"\n[OK] All {len(categories)} expense categories are valid\n")
     return True
@@ -53,7 +53,7 @@ def test_expense_model():
         }
         
         expense = Expense(**test_data)
-        print(f"✅ Expense model created successfully")
+        print(f"[OK] Expense model created successfully")
         print(f"   Category: {expense.category}")
         print(f"   Amount: {expense.amount}")
         print(f"   Description: {expense.description}")
@@ -62,7 +62,7 @@ def test_expense_model():
         
         return True
     except Exception as e:
-        print(f"❌ Failed to create expense model: {e}")
+        print(f"[ERROR] Failed to create expense model: {e}")
         return False
 
 def test_expense_create_model():
@@ -83,7 +83,7 @@ def test_expense_create_model():
         }
         
         expense_create = ExpenseCreate(**frontend_data)
-        print(f"✅ ExpenseCreate model created successfully")
+        print(f"[OK] ExpenseCreate model created successfully")
         print(f"   Category: {expense_create.category}")
         print(f"   Amount: {expense_create.amount}")
         print(f"   Expense Date: {expense_create.expenseDate}")
@@ -92,7 +92,7 @@ def test_expense_create_model():
         
         return True
     except Exception as e:
-        print(f"❌ Failed to create ExpenseCreate model: {e}")
+        print(f"[ERROR] Failed to create ExpenseCreate model: {e}")
         return False
 
 def test_field_mapping():
@@ -116,9 +116,9 @@ def test_field_mapping():
     }
     
     print("Field mapping verification:")
-    print(f"  expenseDate → expense_date: ✅")
-    print(f"  paymentMethod → payment_method: ✅")
-    print(f"  referenceNumber → reference_number: ✅")
+    print(f"  expenseDate -> expense_date: [OK]")
+    print(f"  paymentMethod -> payment_method: [OK]")
+    print(f"  referenceNumber -> reference_number: [OK]")
     
     return True
 
@@ -137,7 +137,7 @@ def test_database_connection():
             statement = select(Expense).limit(5)
             expenses = session.exec(statement).all()
             
-            print(f"✅ Database connection successful")
+            print(f"[OK] Database connection successful")
             print(f"   Found {len(expenses)} existing expenses")
             
             if expenses:
@@ -145,12 +145,12 @@ def test_database_connection():
             
             return True
     except Exception as e:
-        print(f"❌ Database connection failed: {e}")
+        print(f"[ERROR] Database connection failed: {e}")
         return False
 
 def main():
     """Run all tests"""
-    print("🧪 EXPENSES API FIX VERIFICATION")
+    print("EXPENSES API FIX VERIFICATION")
     print("=" * 80)
     
     tests = [
@@ -167,7 +167,7 @@ def main():
             result = test_func()
             results.append((test_name, result))
         except Exception as e:
-            print(f"❌ {test_name} failed with exception: {e}")
+            print(f"[ERROR] {test_name} failed with exception: {e}")
             results.append((test_name, False))
     
     # Summary
@@ -179,15 +179,15 @@ def main():
     total = len(results)
     
     for test_name, result in results:
-        status = "✅ PASS" if result else "❌ FAIL"
+        status = "[PASS]" if result else "[FAIL]"
         print(f"  {status} {test_name}")
     
     print(f"\nResults: {passed}/{total} tests passed")
     
     if passed == total:
-        print(f"\n🎉 All tests passed! Expenses API should be working correctly.")
+        print(f"\nAll tests passed! Expenses API should be working correctly.")
     else:
-        print(f"\n⚠️  Some tests failed. Please check the issues above.")
+        print(f"\nSome tests failed. Please check the issues above.")
     
     return passed == total
 
