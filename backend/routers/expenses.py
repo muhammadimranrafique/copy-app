@@ -102,17 +102,55 @@ def update_expense(
             detail="Expense not found"
         )
     
-    # Update fields
-    for key, value in expense_data.dict().items():
-        setattr(expense, key, value)
-    
-    session.add(expense)
-    session.commit()
-    session.refresh(expense)
-    
-    return expense
+    try:
+        # Convert frontend field names to backend field names
+        expense_dict = expense_data.dict()
+        
+        # Handle field name mapping
+        if 'paymentMethod' in expense_dict:
+            expense_dict['payment_method'] = expense_dict.pop('paymentMethod')
+        if 'referenceNumber' in expense_dict:
+            expense_dict['reference_number'] = expense_dict.pop('referenceNumber')
+        if 'expenseDate' in expense_dict:
+            # Parse date string to datetime
+            from datetime import datetime
+            date_str = expense_dict.pop('expenseDate')
+            if isinstance(date_str, str):
+                expense_dict['expense_date'] = datetime.strptime(date_str, '%Y-%m-%d')
+            else:
+                expense_dict['expense_date'] = date_str
+        
+        # Ensure category is valid ExpenseCategory enum
+        if 'category' in expense_dict:
+            from models import ExpenseCategory
+            category_value = expense_dict['category']
+            if isinstance(category_value, str):
+                try:
+                    expense_dict['category'] = ExpenseCategory(category_value)
+                except ValueError:
+                    raise HTTPException(
+                        status_code=status.HTTP_400_BAD_REQUEST,
+                        detail=f"Invalid category: {category_value}. Valid categories: {[e.value for e in ExpenseCategory]}"
+                    )
+        
+        # Update fields
+        for key, value in expense_dict.items():
+            if hasattr(expense, key):
+                setattr(expense, key, value)
+        
+        session.add(expense)
+        session.commit()
+        session.refresh(expense)
+        
+        return expense
+    except Exception as e:
+        session.rollback()
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail=f"Failed to update expense: {str(e)}"
+        )
 
-@router.delete("/{expense_id}/", status_code=status.HTTP_204_NO_CONTENT)
+@router.delete("/{expense_id}", status_code=status.HTTP_204_NO_CONTENT)
 def delete_expense(
     expense_id: str,
     session: Session = Depends(get_session),

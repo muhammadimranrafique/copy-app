@@ -388,8 +388,41 @@ export async function updateExpense(id: string, data: any) {
     await new Promise(r => setTimeout(r, 300));
     return { success: true, expense: { id, ...data } };
   }
-  const res = await fetchJSON(`/expenses/${id}/`, { method: 'PUT', body: JSON.stringify(data) });
-  return { success: true, expense: res };
+  
+  try {
+    // Validate required fields
+    if (!data.category || !data.amount || !data.description) {
+      throw new Error('Missing required fields: category, amount, and description are required');
+    }
+    
+    // Format the expense data for the API
+    const expenseData = {
+      category: data.category,
+      amount: Number(data.amount),
+      description: data.description,
+      expenseDate: data.expenseDate || new Date().toISOString().split('T')[0],
+      paymentMethod: data.paymentMethod || 'Cash',
+      referenceNumber: data.referenceNumber || undefined
+    };
+
+    if (import.meta.env.VITE_DEBUG === 'true') {
+      console.debug('[Update Expense Request]', expenseData);
+    }
+
+    const res = await fetchJSON(`/expenses/${id}`, { 
+      method: 'PUT', 
+      body: JSON.stringify(expenseData)
+    });
+    
+    if (import.meta.env.VITE_DEBUG === 'true') {
+      console.debug('[Update Expense Response]', res);
+    }
+    
+    return { success: true, expense: res };
+  } catch (error) {
+    console.error('[Update Expense Error]', error);
+    throw error;
+  }
 }
 
 export async function deleteExpense(id: string) {
@@ -397,8 +430,39 @@ export async function deleteExpense(id: string) {
     await new Promise(r => setTimeout(r, 300));
     return { success: true };
   }
-  await fetchJSON(`/expenses/${id}/`, { method: 'DELETE' });
+  await fetchJSON(`/expenses/${id}`, { method: 'DELETE' });
   return { success: true };
+}
+
+export async function getExpense(id: string) {
+  if (USE_MOCK) {
+    await new Promise(r => setTimeout(r, 300));
+    const expense = mockExpenses.find(e => e.id === id);
+    if (!expense) throw new Error('Expense not found');
+    return expense;
+  }
+  
+  try {
+    const res = await fetchJSON(`/expenses/${id}`);
+    
+    if (import.meta.env.VITE_DEBUG === 'true') {
+      console.debug('[Get Expense Response]', res);
+    }
+    
+    // Normalize the response
+    return {
+      id: res.id || '',
+      category: res.category || 'MISC',
+      amount: Number(res.amount || 0),
+      description: res.description || '',
+      expenseDate: res.expenseDate || res.expense_date || new Date().toISOString(),
+      paymentMethod: res.paymentMethod || res.payment_method || 'Cash',
+      referenceNumber: res.referenceNumber || res.reference_number || undefined
+    };
+  } catch (error) {
+    console.error('[Get Expense Error]', error);
+    throw error;
+  }
 }
 
 // Import and re-export types from api-types.ts for consistency

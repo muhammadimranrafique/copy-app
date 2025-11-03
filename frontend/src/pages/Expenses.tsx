@@ -2,7 +2,7 @@ import { useState } from 'react';
 import { Plus, Receipt, Trash2, Edit } from 'lucide-react';
 import { useCurrency } from '@/hooks/useCurrency';
 import { useAuth } from '@/lib/useAuth';
-import { getExpenses, createExpense, deleteExpense } from '@/lib/mock-api';
+import { getExpenses, createExpense, updateExpense, deleteExpense } from '@/lib/mock-api';
 import { useAuthenticatedQuery } from '@/hooks/useAuthenticatedQuery';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -35,6 +35,7 @@ const PAYMENT_METHODS = [
 
 export default function Expenses() {
   const [dialogOpen, setDialogOpen] = useState(false);
+  const [editingExpense, setEditingExpense] = useState<Expense | null>(null);
   const [filterCategory, setFilterCategory] = useState<string>('All');
   const [startDate, setStartDate] = useState<string>('');
   const [endDate, setEndDate] = useState<string>('');
@@ -123,9 +124,16 @@ export default function Expenses() {
     }
 
     try {
-      await createExpense(formData);
-      toast.success('Expense added successfully');
+      if (editingExpense) {
+        await updateExpense(editingExpense.id, formData);
+        toast.success('Expense updated successfully');
+      } else {
+        await createExpense(formData);
+        toast.success('Expense added successfully');
+      }
+      
       setDialogOpen(false);
+      setEditingExpense(null);
       setFormData({
         category: 'MATERIAL',
         amount: 0,
@@ -136,9 +144,22 @@ export default function Expenses() {
       });
       refetchExpenses();
     } catch (error: any) {
-      console.error('Expense creation error:', error);
-      toast.error(error?.message || 'Failed to add expense');
+      console.error('Expense operation error:', error);
+      toast.error(error?.message || `Failed to ${editingExpense ? 'update' : 'add'} expense`);
     }
+  };
+
+  const handleEdit = (expense: Expense) => {
+    setEditingExpense(expense);
+    setFormData({
+      category: expense.category,
+      amount: expense.amount,
+      description: expense.description,
+      expenseDate: expense.expenseDate.split('T')[0],
+      paymentMethod: expense.paymentMethod || 'Cash',
+      referenceNumber: expense.referenceNumber || ''
+    });
+    setDialogOpen(true);
   };
 
   const handleDelete = async (id: string) => {
@@ -153,6 +174,21 @@ export default function Expenses() {
     } catch (error: any) {
       console.error('Expense deletion error:', error);
       toast.error(error?.message || 'Failed to delete expense');
+    }
+  };
+
+  const handleDialogClose = (open: boolean) => {
+    setDialogOpen(open);
+    if (!open) {
+      setEditingExpense(null);
+      setFormData({
+        category: 'MATERIAL',
+        amount: 0,
+        description: '',
+        expenseDate: new Date().toISOString().split('T')[0],
+        paymentMethod: 'Cash',
+        referenceNumber: ''
+      });
     }
   };
 
@@ -185,7 +221,7 @@ export default function Expenses() {
           <h1 className="text-3xl font-bold text-gray-900">Expenses</h1>
           <p className="text-gray-600 mt-1">Track daily expenses during copy production</p>
         </div>
-        <Dialog open={dialogOpen} onOpenChange={setDialogOpen}>
+        <Dialog open={dialogOpen} onOpenChange={handleDialogClose}>
           <DialogTrigger asChild>
             <Button className="flex items-center gap-2">
               <Plus className="h-4 w-4" />
@@ -194,7 +230,7 @@ export default function Expenses() {
           </DialogTrigger>
           <DialogContent className="max-w-md">
             <DialogHeader>
-              <DialogTitle>Add New Expense</DialogTitle>
+              <DialogTitle>{editingExpense ? 'Edit Expense' : 'Add New Expense'}</DialogTitle>
             </DialogHeader>
             <form onSubmit={handleSubmit} className="space-y-4">
               <div>
@@ -281,7 +317,7 @@ export default function Expenses() {
               </div>
 
               <Button type="submit" className="w-full">
-                Add Expense
+                {editingExpense ? 'Update Expense' : 'Add Expense'}
               </Button>
             </form>
           </DialogContent>
@@ -381,7 +417,11 @@ export default function Expenses() {
                   </div>
                   
                   <div className="flex gap-2">
-                    <Button variant="outline" size="sm">
+                    <Button 
+                      variant="outline" 
+                      size="sm"
+                      onClick={() => handleEdit(expense)}
+                    >
                       <Edit className="h-4 w-4" />
                     </Button>
                     <Button 
