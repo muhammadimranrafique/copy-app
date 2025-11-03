@@ -29,7 +29,7 @@ def get_products(
         ProductRead(
             id=p.id,
             productName=p.name,
-            category=p.category,
+            category=p.category or "",
             costPrice=p.cost_price,
             salePrice=p.sale_price,
             stockQuantity=p.stock_quantity,
@@ -52,7 +52,19 @@ def get_product(product_id: str, session: Session = Depends(get_session), curren
             detail="Product not found"
         )
     
-    return product
+    # Return in frontend format
+    return ProductRead(
+        id=product.id,
+        productName=product.name,
+        category=product.category or "",
+        costPrice=product.cost_price,
+        salePrice=product.sale_price,
+        stockQuantity=product.stock_quantity,
+        unit=product.unit,
+        is_active=product.is_active,
+        created_at=product.created_at,
+        updated_at=product.updated_at
+    )
 
 @router.post("/", response_model=ProductRead, status_code=status.HTTP_201_CREATED)
 def create_product(
@@ -65,7 +77,7 @@ def create_product(
         # Convert frontend field names to backend field names
         db_product = Product(
             name=product_data.productName,
-            category=product_data.category,
+            category=product_data.category or "",
             cost_price=product_data.costPrice,
             sale_price=product_data.salePrice,
             stock_quantity=product_data.stockQuantity,
@@ -81,7 +93,7 @@ def create_product(
         return ProductRead(
             id=db_product.id,
             productName=db_product.name,
-            category=db_product.category,
+            category=db_product.category or "",
             costPrice=db_product.cost_price,
             salePrice=db_product.sale_price,
             stockQuantity=db_product.stock_quantity,

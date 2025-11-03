@@ -11,7 +11,16 @@ function getAuthHeaders() {
 
 async function fetchJSON(path: string, opts: RequestInit = {}) {
   const url = `${API_BASE}${path}`;
-  const headers = { 'Content-Type': 'application/json', ...getAuthHeaders(), ...(opts.headers || {}) } as Record<string,string>;
+  const headers = { 
+    'Content-Type': 'application/json',
+    'Accept': 'application/json',
+    ...getAuthHeaders(),
+    ...(opts.headers || {})
+  } as Record<string,string>;
+
+  // Add CORS mode and credentials
+  opts.mode = 'cors';
+  opts.credentials = 'include';
 
   // Debug logging: Log the request
   const isDebug = import.meta.env.VITE_DEBUG === 'true';
@@ -102,10 +111,52 @@ export async function getOrders(params: any) {
     await new Promise(r => setTimeout(r, 300));
     return { orders: mockOrders };
   }
-  const qs = params && Object.keys(params).length ? `?${new URLSearchParams(params).toString()}` : '';
-  const res = await fetchJSON(`/orders/${qs}`);
-  // backend returns an array of orders; normalize to { orders }
-  return { orders: Array.isArray(res) ? res : (res?.orders ?? []) };
+  try {
+    const qs = params && Object.keys(params).length ? `?${new URLSearchParams(params).toString()}` : '';
+    const res = await fetchJSON(`/orders/${qs}`);
+    
+    // Debug logging for response
+    if (import.meta.env.VITE_DEBUG === 'true') {
+      console.debug('[Orders Response]', res);
+    }
+    
+    // Normalize response to always return { orders: [] }
+    const orders = Array.isArray(res) ? res : (res?.orders ?? []);
+    
+    // Define order type for proper typing
+    type OrderResponse = {
+      id: string;
+      orderNumber: string;
+      leaderId: string;
+      leaderName?: string;
+      totalAmount: number;
+      status: string;
+      orderDate: string;
+      createdAt: string;
+    };
+    
+    // Debug logging
+    if (import.meta.env.VITE_DEBUG === 'true') {
+      console.debug('[Raw Orders Data]', orders);
+    }
+    
+    // Ensure all required fields are present and properly formatted
+    const normalizedOrders = orders.map((order: any) => ({
+      id: order.id || '',
+      orderNumber: order.orderNumber || 'N/A',
+      leaderId: order.leaderId || order.client_id || '',
+      leaderName: order.leaderName || 'N/A',
+      totalAmount: Number(order.totalAmount || order.total_amount || 0),
+      status: order.status || 'Pending',
+      orderDate: order.orderDate || order.order_date || new Date().toISOString(),
+      createdAt: order.createdAt || order.created_at || new Date().toISOString()
+    }));
+    
+    return { orders: normalizedOrders };
+  } catch (error) {
+    console.error('[Orders API Error]', error);
+    throw error;
+  }
 }
 
 export async function createOrder(data: any) {
@@ -155,14 +206,41 @@ export async function createProduct(data: any) {
   return { success: true, product: res };
 }
 
-export async function getPayments(params: any) {
+export async function getPayments(params: any = {}) {
   if (USE_MOCK) {
     await new Promise(r => setTimeout(r, 300));
     return { payments: mockPayments };
   }
-  const qs = params && Object.keys(params).length ? `?${new URLSearchParams(params).toString()}` : '';
-  const res = await fetchJSON(`/payments/${qs}`);
-  return { payments: Array.isArray(res) ? res : (res?.payments ?? []) };
+  try {
+    const qs = params && Object.keys(params).length ? `?${new URLSearchParams(params).toString()}` : '';
+    const res = await fetchJSON(`/payments/${qs}`);
+    
+    if (import.meta.env.VITE_DEBUG === 'true') {
+      console.debug('[Payments Response]', res);
+    }
+    
+    // Normalize response to always return { payments: [] }
+    const payments = Array.isArray(res) ? res : (res?.payments ?? []);
+    
+    // Ensure all required fields are present and properly formatted
+    const normalizedPayments = payments.map((payment: any) => ({
+      id: payment.id || '',
+      amount: Number(payment.amount || 0),
+      method: payment.method || 'Cash',
+      status: payment.status || 'Completed',
+      paymentDate: payment.paymentDate || new Date().toISOString(),
+      createdAt: payment.createdAt || new Date().toISOString(),
+      leaderId: payment.leaderId || '',
+      orderId: payment.orderId || undefined,
+      referenceNumber: payment.referenceNumber || undefined,
+      leaderName: payment.leaderName || 'N/A'
+    }));
+    
+    return { payments: normalizedPayments };
+  } catch (error) {
+    console.error('[Payments API Error]', error);
+    throw error;
+  }
 }
 
 export async function createPayment(data: any) {
@@ -170,8 +248,41 @@ export async function createPayment(data: any) {
     await new Promise(r => setTimeout(r, 300));
     return { success: true, payment: { id: Date.now().toString(), ...data } };
   }
-  const res = await fetchJSON('/payments/', { method: 'POST', body: JSON.stringify(data) });
-  return { success: true, payment: res };
+  
+  try {
+    // Validate required fields
+    if (!data.amount || !data.method || !data.leaderId) {
+      throw new Error('Missing required fields: amount, method, and leaderId are required');
+    }
+    
+    // Format the payment data for the API
+    const paymentData = {
+      amount: Number(data.amount),
+      method: data.method,  // Send as-is, backend will handle conversion
+      leaderId: data.leaderId,
+      paymentDate: data.paymentDate ? new Date(data.paymentDate).toISOString().split('T')[0] : undefined,
+      referenceNumber: data.referenceNumber || undefined,
+      orderId: data.orderId || undefined
+    };
+
+    if (import.meta.env.VITE_DEBUG === 'true') {
+      console.debug('[Payment Request]', paymentData);
+    }
+
+    const res = await fetchJSON('/payments/', { 
+      method: 'POST', 
+      body: JSON.stringify(paymentData)
+    });
+    
+    if (import.meta.env.VITE_DEBUG === 'true') {
+      console.debug('[Payment Response]', res);
+    }
+    
+    return { success: true, payment: res };
+  } catch (error) {
+    console.error('[Create Payment Error]', error);
+    throw error;
+  }
 }
 
 export async function getDashboardData(params: any) {
@@ -201,9 +312,33 @@ export async function getExpenses(params: any) {
     await new Promise(r => setTimeout(r, 300));
     return { expenses: mockExpenses };
   }
-  const qs = params && Object.keys(params).length ? `?${new URLSearchParams(params).toString()}` : '';
-  const res = await fetchJSON(`/expenses/${qs}`);
-  return { expenses: Array.isArray(res) ? res : (res?.expenses ?? []) };
+  try {
+    const qs = params && Object.keys(params).length ? `?${new URLSearchParams(params).toString()}` : '';
+    const res = await fetchJSON(`/expenses/${qs}`);
+    
+    if (import.meta.env.VITE_DEBUG === 'true') {
+      console.debug('[Expenses Response]', res);
+    }
+    
+    // Normalize response to always return { expenses: [] }
+    const expenses = Array.isArray(res) ? res : (res?.expenses ?? []);
+    
+    // Ensure all required fields are present and properly formatted
+    const normalizedExpenses = expenses.map((expense: any) => ({
+      id: expense.id || '',
+      category: expense.category || 'MISC',
+      amount: Number(expense.amount || 0),
+      description: expense.description || '',
+      expenseDate: expense.expenseDate || expense.expense_date || new Date().toISOString(),
+      paymentMethod: expense.paymentMethod || expense.payment_method || 'Cash',
+      referenceNumber: expense.referenceNumber || expense.reference_number || undefined
+    }));
+    
+    return { expenses: normalizedExpenses };
+  } catch (error) {
+    console.error('[Expenses API Error]', error);
+    throw error;
+  }
 }
 
 export async function createExpense(data: any) {
@@ -211,8 +346,41 @@ export async function createExpense(data: any) {
     await new Promise(r => setTimeout(r, 300));
     return { success: true, expense: { id: Date.now().toString(), ...data } };
   }
-  const res = await fetchJSON('/expenses/', { method: 'POST', body: JSON.stringify(data) });
-  return { success: true, expense: res };
+  
+  try {
+    // Validate required fields
+    if (!data.category || !data.amount || !data.description) {
+      throw new Error('Missing required fields: category, amount, and description are required');
+    }
+    
+    // Format the expense data for the API
+    const expenseData = {
+      category: data.category,
+      amount: Number(data.amount),
+      description: data.description,
+      expenseDate: data.expenseDate || new Date().toISOString().split('T')[0],
+      paymentMethod: data.paymentMethod || 'Cash',
+      referenceNumber: data.referenceNumber || undefined
+    };
+
+    if (import.meta.env.VITE_DEBUG === 'true') {
+      console.debug('[Expense Request]', expenseData);
+    }
+
+    const res = await fetchJSON('/expenses/', { 
+      method: 'POST', 
+      body: JSON.stringify(expenseData)
+    });
+    
+    if (import.meta.env.VITE_DEBUG === 'true') {
+      console.debug('[Expense Response]', res);
+    }
+    
+    return { success: true, expense: res };
+  } catch (error) {
+    console.error('[Create Expense Error]', error);
+    throw error;
+  }
 }
 
 export async function updateExpense(id: string, data: any) {
@@ -229,13 +397,9 @@ export async function deleteExpense(id: string) {
     await new Promise(r => setTimeout(r, 300));
     return { success: true };
   }
-  await fetchJSON(`/expenses/${id}`, { method: 'DELETE' });
+  await fetchJSON(`/expenses/${id}/`, { method: 'DELETE' });
   return { success: true };
 }
 
-// Type exports kept for compatibility
-export type Order = { id: string; orderNumber?: string; leaderId?: string; orderDate?: string; totalAmount?: number; status?: string };
-export type Leader = { id: string; name: string; type: string; contact: string; address: string; openingBalance: number };
-export type Product = { id: string; productName?: string; category?: string; costPrice?: number; salePrice?: number; stockQuantity?: number; unit?: string };
-export type Payment = { id: string; amount?: number; method?: string; paymentDate?: string; leaderId?: string; referenceNumber?: string };
-export type Expense = { id: string; category: string; amount: number; description: string; expenseDate: string; paymentMethod?: string; referenceNumber?: string };
+// Import and re-export types from api-types.ts for consistency
+export type { Order, Leader, Product, Payment, PaymentCreate, Expense, DashboardData } from './api-types';

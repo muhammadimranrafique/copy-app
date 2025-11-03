@@ -21,16 +21,25 @@ app = FastAPI(
     description="Backend API for School Copy Manufacturing Business Management",
     version="1.0.0",
     lifespan=lifespan,
-    redirect_slashes=False  # Disable automatic trailing slash redirects
+    docs_url="/docs",  # Keep docs at root for easier access
+    openapi_url="/openapi.json",  # Keep OpenAPI spec at root
+    redirect_slashes=False  # Disable to prevent 307 redirects
 )
 
 # CORS Middleware
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=settings.allowed_origins,
+    allow_origins=[
+        "http://localhost:5173",  # Vite dev server
+        "http://localhost:5174",
+        "http://127.0.0.1:5173",
+        "http://127.0.0.1:5174",
+        *settings.allowed_origins
+    ],
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
+    expose_headers=["*"]
 )
 
 @app.get("/")

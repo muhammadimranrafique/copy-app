@@ -27,6 +27,14 @@ class PaymentMode(str, Enum):
     CHEQUE = "Cheque"
     UPI = "UPI"
 
+class ExpenseCategory(str, Enum):
+    PRINTING = "PRINTING"
+    DELIVERY = "DELIVERY"
+    MATERIAL = "MATERIAL"
+    STAFF = "STAFF"
+    UTILITIES = "UTILITIES"
+    MISC = "MISC"
+
 # Base Models
 class ClientBase(SQLModel):
     name: str
@@ -42,6 +50,7 @@ class Client(ClientBase, table=True):
     created_at: datetime = Field(default_factory=datetime.utcnow)
     
     orders: List["Order"] = Relationship(back_populates="client")
+    payments: List["Payment"] = Relationship(back_populates="client")
 
 class ClientCreate(ClientBase):
     pass
@@ -77,19 +86,18 @@ class ProductCreate(SQLModel):
 
 class ProductRead(SQLModel):
     id: UUID
-    productName: str = PydanticField(..., alias="name")
+    productName: str
     category: str
-    costPrice: float = PydanticField(..., alias="cost_price")
-    salePrice: float = PydanticField(..., alias="sale_price")
-    stockQuantity: int = PydanticField(..., alias="stock_quantity")
+    costPrice: float
+    salePrice: float
+    stockQuantity: int
     unit: str
     is_active: bool
-    createdAt: datetime = PydanticField(..., alias="created_at")
-    updatedAt: datetime = PydanticField(..., alias="updated_at")
+    created_at: datetime
+    updated_at: datetime
 
     class Config:
-        orm_mode = True
-        allow_population_by_field_name = True
+        from_attributes = True
 
 # Order Models
 class OrderBase(SQLModel):
@@ -105,8 +113,15 @@ class Order(OrderBase, table=True):
     order_date: datetime = Field(default_factory=datetime.utcnow)
     created_at: datetime = Field(default_factory=datetime.utcnow)
     
-    client: Client = Relationship(back_populates="orders")
-    payments: List["Payment"] = Relationship(back_populates="order")
+    # Ensure client relationship is properly loaded
+    client: "Client" = Relationship(
+        back_populates="orders",
+        sa_relationship_kwargs={"lazy": "joined"}  # Enable eager loading
+    )
+    payments: List["Payment"] = Relationship(
+        back_populates="order",
+        sa_relationship_kwargs={"lazy": "selectin"}  # Use selectin loading for collections
+    )
 
 class OrderCreate(SQLModel):
     orderNumber: str
@@ -119,31 +134,44 @@ class OrderRead(SQLModel):
     orderNumber: str = PydanticField(..., alias="order_number")
     leaderId: UUID = PydanticField(..., alias="client_id")
     totalAmount: float = PydanticField(..., alias="total_amount")
-    status: str
+    status: str = PydanticField(..., alias="status")  # Use str to ensure enum values are serialized
     orderDate: datetime = PydanticField(..., alias="order_date")
     createdAt: datetime = PydanticField(..., alias="created_at")
+    leaderName: Optional[str] = None
 
     class Config:
-        orm_mode = True
-        allow_population_by_field_name = True
+        from_attributes = True
+        populate_by_name = True
+        json_encoders = {
+            UUID: str,  # Ensure UUIDs are properly serialized
+            datetime: lambda dt: dt.isoformat(),  # Format datetime as ISO string
+            OrderStatus: lambda s: s.value  # Convert enum to string
+        }
 
 # Payment Models
 class PaymentBase(SQLModel):
-    amount: float
+    amount: float = Field(gt=0)
     mode: PaymentMode
-    status: PaymentStatus = PaymentStatus.COMPLETED
-    reference_number: Optional[str] = None
+    status: PaymentStatus = Field(default=PaymentStatus.COMPLETED)
+    reference_number: Optional[str] = Field(default=None)
 
 class Payment(PaymentBase, table=True):
     __tablename__ = "payments"
     
     id: UUID = Field(default_factory=uuid4, primary_key=True)
-    order_id: Optional[UUID] = Field(foreign_key="orders.id", default=None)
-    client_id: Optional[UUID] = Field(foreign_key="clients.id", default=None)
+    order_id: Optional[UUID] = Field(default=None, foreign_key="orders.id", nullable=True, sa_column_kwargs={"nullable": True})
+    client_id: UUID = Field(foreign_key="clients.id")
     payment_date: datetime = Field(default_factory=datetime.utcnow)
     created_at: datetime = Field(default_factory=datetime.utcnow)
     
     order: Optional[Order] = Relationship(back_populates="payments")
+    client: "Client" = Relationship(
+        back_populates="payments",
+        sa_relationship_kwargs={"lazy": "joined"}
+    )
+
+    class Config:
+        arbitrary_types_allowed = True
 
 class PaymentCreate(SQLModel):
     amount: float
@@ -151,22 +179,46 @@ class PaymentCreate(SQLModel):
     leaderId: UUID
     paymentDate: Optional[str] = None
     referenceNumber: Optional[str] = None
+    orderId: Optional[UUID] = None
+
+    class Config:
+        schema_extra = {
+            "example": {
+                "amount": 1000.0,
+                "method": "Bank Transfer",
+                "leaderId": "uuid-string",
+                "paymentDate": "2025-11-03",
+                "referenceNumber": "REF123",
+                "orderId": None
+            }
+        }
 
 class PaymentRead(SQLModel):
     id: UUID
     amount: float
     method: str = PydanticField(..., alias="mode")
+    status: str = PydanticField(..., alias="status")
     paymentDate: datetime = PydanticField(..., alias="payment_date")
-    leaderId: Optional[UUID] = PydanticField(None, alias="client_id")
+    createdAt: datetime = PydanticField(..., alias="created_at")
+    leaderId: UUID = PydanticField(..., alias="client_id")
+    orderId: Optional[UUID] = PydanticField(None, alias="order_id")
     referenceNumber: Optional[str] = PydanticField(None, alias="reference_number")
+    leaderName: Optional[str] = None
 
     class Config:
-        orm_mode = True
-        allow_population_by_field_name = True
+        from_attributes = True
+        populate_by_name = True
+        use_enum_values = True
+        json_encoders = {
+            UUID: str,
+            datetime: lambda v: v.isoformat(),
+            PaymentStatus: lambda v: v.value,
+            PaymentMode: lambda v: v.value
+        }
 
 # Expense Models
 class ExpenseBase(SQLModel):
-    category: str
+    category: ExpenseCategory
     amount: float
     description: str
     payment_method: Optional[str] = "Cash"
@@ -180,7 +232,7 @@ class Expense(ExpenseBase, table=True):
     created_at: datetime = Field(default_factory=datetime.utcnow)
 
 class ExpenseCreate(SQLModel):
-    category: str
+    category: ExpenseCategory
     amount: float
     description: str
     expenseDate: str
@@ -198,8 +250,14 @@ class ExpenseRead(SQLModel):
     createdAt: datetime = PydanticField(..., alias="created_at")
 
     class Config:
-        orm_mode = True
-        allow_population_by_field_name = True
+        from_attributes = True
+        populate_by_name = True
+        use_enum_values = True
+        json_encoders = {
+            UUID: str,
+            datetime: lambda v: v.isoformat(),
+            ExpenseCategory: lambda v: v.value
+        }
 
 # User Model for Authentication
 class UserBase(SQLModel):

@@ -10,7 +10,8 @@ from fastapi.responses import FileResponse
 
 router = APIRouter(prefix="/orders", tags=["Orders"])
 
-@router.get("/", response_model=List[OrderRead])
+@router.get("", response_model=List[OrderRead])  # Match both /orders and /orders/
+@router.get("/", response_model=List[OrderRead])  # Match both /orders and /orders/
 def get_orders(
     skip: int = 0,
     limit: int = 100,
@@ -19,14 +20,68 @@ def get_orders(
     current_user: User = Depends(get_current_user)
 ):
     """Get all orders with optional filters."""
-    statement = select(Order)
-    
-    if status_filter:
-        statement = statement.where(Order.status == status_filter)
-    
-    statement = statement.offset(skip).limit(limit)
-    orders = session.exec(statement).all()
-    return orders
+    try:
+        # Debug logging
+        print(f"Fetching orders with params: skip={skip}, limit={limit}, status={status_filter}")
+        
+        # Construct base query with left join to handle cases where client might be missing
+        statement = (
+            select(Order)
+            .outerjoin(Client)  # Use outer join to handle missing clients
+            .order_by(Order.created_at.desc())  # Sort by newest first
+        )
+        
+        # Apply status filter if provided
+        if status_filter:
+            try:
+                status_enum = OrderStatus(status_filter)  # Validate status value
+                statement = statement.where(Order.status == status_enum)
+            except ValueError:
+                print(f"Invalid status filter received: {status_filter}")
+                raise HTTPException(
+                    status_code=status.HTTP_400_BAD_REQUEST,
+                    detail=f"Invalid status filter: {status_filter}"
+                )
+        
+        # Execute query with pagination
+        try:
+            orders = session.exec(statement.offset(skip).limit(limit)).all()
+            print(f"Found {len(orders)} orders")
+        except Exception as db_error:
+            print(f"Database error: {str(db_error)}")
+            raise HTTPException(
+                status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+                detail="Database error occurred while fetching orders"
+            )
+        
+        # Convert orders to response model
+        response_orders = []
+        for order in orders:
+            try:
+                order_data = OrderRead(
+                    id=order.id,
+                    order_number=order.order_number,
+                    client_id=order.client_id,
+                    total_amount=order.total_amount,
+                    status=order.status.value if isinstance(order.status, OrderStatus) else str(order.status),
+                    order_date=order.order_date,
+                    created_at=order.created_at,
+                    leaderName=order.client.name if order.client else None
+                )
+                response_orders.append(order_data)
+            except Exception as e:
+                print(f"Error processing order {order.id}: {str(e)}")
+                continue
+        
+        return response_orders
+        
+    except Exception as e:
+        # Log the error for debugging
+        print(f"Error fetching orders: {str(e)}")
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail="Failed to fetch orders. Please try again later."
+        )
 
 @router.get("/{order_id}", response_model=OrderRead)
 def get_order(order_id: str, session: Session = Depends(get_session), current_user: User = Depends(get_current_user)):

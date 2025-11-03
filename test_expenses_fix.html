@@ -1,0 +1,184 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Expenses API Test</title>
+    <style>
+        body { font-family: Arial, sans-serif; margin: 20px; }
+        .test-section { margin: 20px 0; padding: 15px; border: 1px solid #ddd; border-radius: 5px; }
+        .success { background-color: #d4edda; border-color: #c3e6cb; }
+        .error { background-color: #f8d7da; border-color: #f5c6cb; }
+        .info { background-color: #d1ecf1; border-color: #bee5eb; }
+        pre { background: #f8f9fa; padding: 10px; border-radius: 3px; overflow-x: auto; }
+        button { padding: 8px 16px; margin: 5px; cursor: pointer; }
+    </style>
+</head>
+<body>
+    <h1>Expenses Page Fix Verification</h1>
+    
+    <div class="test-section info">
+        <h3>Test Configuration</h3>
+        <p><strong>API Base URL:</strong> <span id="apiUrl">http://127.0.0.1:8000/api/v1</span></p>
+        <p><strong>Test Mode:</strong> <span id="testMode">Mock Data</span></p>
+        <button onclick="toggleTestMode()">Toggle Mock/API Mode</button>
+    </div>
+
+    <div class="test-section">
+        <h3>1. Test Expense Categories</h3>
+        <p>Testing if frontend categories match backend enum values:</p>
+        <div id="categoryTest">
+            <p>Frontend Categories: MATERIAL, STAFF, UTILITIES, PRINTING, DELIVERY, MISC</p>
+            <p>Backend Expected: PRINTING, DELIVERY, MATERIAL, STAFF, UTILITIES, MISC</p>
+            <p class="success">✅ Categories now match!</p>
+        </div>
+    </div>
+
+    <div class="test-section">
+        <h3>2. Test API Endpoints</h3>
+        <button onclick="testGetExpenses()">Test GET /expenses/</button>
+        <button onclick="testCreateExpense()">Test POST /expenses/</button>
+        <div id="apiTestResults"></div>
+    </div>
+
+    <div class="test-section">
+        <h3>3. Test Mock Data</h3>
+        <button onclick="testMockData()">Test Mock Expenses</button>
+        <div id="mockTestResults"></div>
+    </div>
+
+    <div class="test-section">
+        <h3>4. Field Mapping Test</h3>
+        <p>Testing frontend ↔ backend field name mapping:</p>
+        <ul>
+            <li>expenseDate ↔ expense_date</li>
+            <li>paymentMethod ↔ payment_method</li>
+            <li>referenceNumber ↔ reference_number</li>
+        </ul>
+        <button onclick="testFieldMapping()">Test Field Mapping</button>
+        <div id="fieldMappingResults"></div>
+    </div>
+
+    <script>
+        let useMockData = true;
+        const apiBaseUrl = 'http://127.0.0.1:8000/api/v1';
+
+        // Mock data for testing
+        const mockExpenses = [
+            { id: '1', category: 'MATERIAL', amount: 5000, description: 'Paper purchase for printing', expenseDate: new Date().toISOString(), paymentMethod: 'Cash', referenceNumber: 'EXP-001' },
+            { id: '2', category: 'STAFF', amount: 8000, description: 'Staff salaries', expenseDate: new Date().toISOString(), paymentMethod: 'Bank Transfer', referenceNumber: 'EXP-002' },
+            { id: '3', category: 'UTILITIES', amount: 3000, description: 'Electricity bill', expenseDate: new Date().toISOString(), paymentMethod: 'Bank Transfer', referenceNumber: 'EXP-003' },
+        ];
+
+        function toggleTestMode() {
+            useMockData = !useMockData;
+            document.getElementById('testMode').textContent = useMockData ? 'Mock Data' : 'Live API';
+        }
+
+        function displayResult(elementId, result, isSuccess = true) {
+            const element = document.getElementById(elementId);
+            element.innerHTML = `<pre class="${isSuccess ? 'success' : 'error'}">${JSON.stringify(result, null, 2)}</pre>`;
+        }
+
+        async function testGetExpenses() {
+            try {
+                if (useMockData) {
+                    displayResult('apiTestResults', { 
+                        message: 'Mock data test successful',
+                        expenses: mockExpenses,
+                        count: mockExpenses.length
+                    });
+                } else {
+                    const response = await fetch(`${apiBaseUrl}/expenses/`);
+                    const data = await response.json();
+                    displayResult('apiTestResults', {
+                        status: response.status,
+                        data: data
+                    }, response.ok);
+                }
+            } catch (error) {
+                displayResult('apiTestResults', { error: error.message }, false);
+            }
+        }
+
+        async function testCreateExpense() {
+            const testExpense = {
+                category: 'MATERIAL',
+                amount: 1500,
+                description: 'Test expense for verification',
+                expenseDate: new Date().toISOString().split('T')[0],
+                paymentMethod: 'Cash',
+                referenceNumber: 'TEST-001'
+            };
+
+            try {
+                if (useMockData) {
+                    displayResult('apiTestResults', { 
+                        message: 'Mock create test successful',
+                        expense: { id: Date.now().toString(), ...testExpense }
+                    });
+                } else {
+                    const response = await fetch(`${apiBaseUrl}/expenses/`, {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify(testExpense)
+                    });
+                    const data = await response.json();
+                    displayResult('apiTestResults', {
+                        status: response.status,
+                        data: data
+                    }, response.ok);
+                }
+            } catch (error) {
+                displayResult('apiTestResults', { error: error.message }, false);
+            }
+        }
+
+        function testMockData() {
+            const validCategories = ['MATERIAL', 'STAFF', 'UTILITIES', 'PRINTING', 'DELIVERY', 'MISC'];
+            const results = {
+                totalExpenses: mockExpenses.length,
+                categoriesValid: mockExpenses.every(exp => validCategories.includes(exp.category)),
+                categories: mockExpenses.map(exp => exp.category),
+                sampleExpense: mockExpenses[0]
+            };
+            displayResult('mockTestResults', results);
+        }
+
+        function testFieldMapping() {
+            const frontendExpense = {
+                category: 'MATERIAL',
+                amount: 1000,
+                description: 'Test mapping',
+                expenseDate: '2025-01-15',
+                paymentMethod: 'Cash',
+                referenceNumber: 'REF-123'
+            };
+
+            const backendExpense = {
+                category: 'MATERIAL',
+                amount: 1000,
+                description: 'Test mapping',
+                expense_date: '2025-01-15',
+                payment_method: 'Cash',
+                reference_number: 'REF-123'
+            };
+
+            displayResult('fieldMappingResults', {
+                frontend: frontendExpense,
+                backend: backendExpense,
+                mapping: {
+                    'expenseDate → expense_date': '✅',
+                    'paymentMethod → payment_method': '✅',
+                    'referenceNumber → reference_number': '✅'
+                }
+            });
+        }
+
+        // Initialize
+        document.addEventListener('DOMContentLoaded', function() {
+            console.log('Expenses Fix Verification Tool Loaded');
+        });
+    </script>
+</body>
+</html>

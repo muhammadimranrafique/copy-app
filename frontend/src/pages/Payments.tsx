@@ -79,8 +79,23 @@ export default function Payments() {
       toast.error('Amount must be greater than 0');
       return;
     }
+
+    // Debug logging
+    if (import.meta.env.VITE_DEBUG === 'true') {
+      console.debug('[Payment Form Data]', formData);
+    }
+    
     try {
-      await createPayment(formData);
+      const result = await createPayment({
+        ...formData,
+        amount: Number(formData.amount),
+        paymentDate: formData.paymentDate ? new Date(formData.paymentDate).toISOString() : undefined
+      });
+      
+      if (import.meta.env.VITE_DEBUG === 'true') {
+        console.debug('[Payment Result]', result);
+      }
+
       toast.success('Payment recorded successfully');
       setDialogOpen(false);
       setFormData({

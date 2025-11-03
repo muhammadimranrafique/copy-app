@@ -19,7 +19,7 @@ export const mockPayments = [
 ];
 
 export const mockExpenses = [
-  { id: '1', category: 'Material', amount: 5000, description: 'Paper purchase for printing', expenseDate: new Date().toISOString(), paymentMethod: 'Cash', referenceNumber: 'EXP-001' },
-  { id: '2', category: 'Labor', amount: 8000, description: 'Staff salaries', expenseDate: new Date().toISOString(), paymentMethod: 'Bank Transfer', referenceNumber: 'EXP-002' },
-  { id: '3', category: 'Utilities', amount: 3000, description: 'Electricity bill', expenseDate: new Date().toISOString(), paymentMethod: 'Bank Transfer', referenceNumber: 'EXP-003' },
+  { id: '1', category: 'MATERIAL', amount: 5000, description: 'Paper purchase for printing', expenseDate: new Date().toISOString(), paymentMethod: 'Cash', referenceNumber: 'EXP-001' },
+  { id: '2', category: 'STAFF', amount: 8000, description: 'Staff salaries', expenseDate: new Date().toISOString(), paymentMethod: 'Bank Transfer', referenceNumber: 'EXP-002' },
+  { id: '3', category: 'UTILITIES', amount: 3000, description: 'Electricity bill', expenseDate: new Date().toISOString(), paymentMethod: 'Bank Transfer', referenceNumber: 'EXP-003' },
 ];

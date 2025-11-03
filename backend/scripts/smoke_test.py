@@ -25,6 +25,15 @@ if not schools:
 school = next((x for x in schools if x.get('name') == 'Demo School'), schools[0])
 print('using school', school['id'], school['name'])
 
+# Test GET orders endpoint first
+resp = s.get(f"{BASE}/api/v1/orders/", headers=headers)
+print('get orders status', resp.status_code)
+if resp.status_code != 200:
+    print('get orders error:', resp.text)
+else:
+    orders = resp.json()
+    print('existing orders count:', len(orders))
+
 # create order
 order_payload = {
     "order_number": "ORD-1001",
@@ -36,6 +45,15 @@ print('create order status', resp.status_code)
 resp.raise_for_status()
 order = resp.json()
 print('created order', order)
+
+# Test GET orders endpoint again after creating
+resp = s.get(f"{BASE}/api/v1/orders/", headers=headers)
+print('get orders after create status', resp.status_code)
+if resp.status_code != 200:
+    print('get orders after create error:', resp.text)
+else:
+    orders = resp.json()
+    print('orders count after create:', len(orders))
 
 # request invoice
 out_dir = os.path.join(os.path.dirname(__file__), '..', 'invoices')

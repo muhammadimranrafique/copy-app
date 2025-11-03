@@ -18,9 +18,11 @@ interface Order {
   id: string;
   orderNumber: string;
   leaderId: string;
-  orderDate: string;
+  leaderName: string;
   totalAmount: number;
   status: string;
+  orderDate: string;
+  createdAt: string;
 }
 
 interface Leader {
@@ -213,19 +215,22 @@ export default function Orders() {
                       <ShoppingCart className="w-6 h-6 text-primary" />
                     </div>
                     <div>
-                      <h3 className="font-semibold text-lg">{order.orderNumber}</h3>
+                      <h3 className="font-semibold text-lg">{order.orderNumber !== 'N/A' ? `Order #${order.orderNumber}` : order.orderNumber}</h3>
                       <p className="text-sm text-muted-foreground">
                         {order.orderDate ? format(new Date(order.orderDate), 'MMM dd, yyyy') : 'N/A'}
+                      </p>
+                      <p className="text-sm text-muted-foreground mt-1">
+                        Leader: {order.leaderName || 'N/A'}
                       </p>
                     </div>
                   </div>
                   <div className="flex items-center gap-4">
                     <div className="text-right">
                       <p className="text-sm text-muted-foreground">Amount</p>
-                      <p className="text-xl font-bold">{formatCurrency(order.totalAmount || 0)}</p>
+                      <p className="text-xl font-bold">{formatCurrency(order.totalAmount)}</p>
                     </div>
                     <Badge variant={getStatusColor(order.status)}>
-                      {order.status}
+                      {order.status || 'Pending'}
                     </Badge>
                   </div>
                 </div>

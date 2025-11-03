@@ -3,8 +3,9 @@ from sqlmodel import Session, select
 from typing import List
 from datetime import datetime
 from database import get_session
-from models import Payment, PaymentCreate, PaymentRead, Order, User, PaymentStatus, PaymentMode
+from models import Payment, PaymentCreate, PaymentRead, Order, User, PaymentStatus, PaymentMode, Client
 from utils.auth import get_current_user
+from sqlalchemy.orm import joinedload
 
 router = APIRouter(prefix="/payments", tags=["Payments"])
 
@@ -16,9 +17,35 @@ def get_payments(
     current_user: User = Depends(get_current_user)
 ):
     """Get all payments."""
-    statement = select(Payment).offset(skip).limit(limit)
-    payments = session.exec(statement).all()
-    return payments
+    try:
+        # Join with Client to get leader names
+        statement = (
+            select(Payment, Client)
+            .outerjoin(Client, Payment.client_id == Client.id)
+            .order_by(Payment.created_at.desc())
+            .offset(skip)
+            .limit(limit)
+        )
+        
+        results = session.exec(statement).all()
+        payments = []
+        
+        for payment, client in results:
+            payment_dict = payment.model_dump()
+            payment_dict["leaderName"] = client.name if client else None
+            # Convert enum values to strings
+            payment_dict["status"] = payment.status.value if hasattr(payment.status, 'value') else str(payment.status)
+            payment_dict["mode"] = payment.mode.value if hasattr(payment.mode, 'value') else str(payment.mode)
+            payments.append(PaymentRead(**payment_dict))
+        
+        return payments
+        
+    except Exception as e:
+        print(f"Error fetching payments: {str(e)}")
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail=f"Failed to fetch payments: {str(e)}"
+        )
 
 @router.get("/{payment_id}", response_model=PaymentRead)
 def get_payment(payment_id: str, session: Session = Depends(get_session), current_user: User = Depends(get_current_user)):
@@ -42,28 +69,49 @@ def create_payment(
 ):
     """Record a new payment."""
     try:
-        # Convert method string to PaymentMode enum
+        print(f"Creating payment with data: {payment_data.dict()}")
+        
+        # Verify client exists first
+        client_statement = select(Client).where(Client.id == payment_data.leaderId)
+        client = session.exec(client_statement).first()
+        
+        if not client:
+            print(f"Client not found with ID: {payment_data.leaderId}")
+            raise HTTPException(
+                status_code=status.HTTP_404_NOT_FOUND,
+                detail=f"Leader/Client not found with ID: {payment_data.leaderId}"
+            )
+
+        print(f"Found client: {client.name}")
+
+        # Handle payment method mapping
+        method_str = payment_data.method.upper().replace(" ", "_")
         method_mapping = {
-            "Cash": PaymentMode.CASH,
-            "Bank Transfer": PaymentMode.BANK_TRANSFER,
-            "Cheque": PaymentMode.CHEQUE,
+            "CASH": PaymentMode.CASH,
+            "BANK_TRANSFER": PaymentMode.BANK_TRANSFER,
+            "CHEQUE": PaymentMode.CHEQUE,
             "UPI": PaymentMode.UPI
         }
         
-        mode = method_mapping.get(payment_data.method, PaymentMode.CASH)
-        
-        # Parse payment date if provided
-        payment_date = datetime.utcnow()
-        if payment_data.paymentDate:
-            try:
-                payment_date = datetime.fromisoformat(payment_data.paymentDate)
-            except ValueError:
-                # If parsing fails, use current datetime
-                pass
-        
-        # Create payment with proper field mapping
+        mode = method_mapping.get(method_str, PaymentMode.CASH)
+        print(f"Mapped payment method {payment_data.method} to {mode}")
+
+        # Parse payment date with fallback
+        try:
+            payment_date = (
+                datetime.fromisoformat(payment_data.paymentDate.split('T')[0])
+                if payment_data.paymentDate
+                else datetime.utcnow()
+            )
+        except (ValueError, AttributeError) as e:
+            print(f"Date parsing error: {e}, using current time")
+            payment_date = datetime.utcnow()
+
+        print(f"Using payment date: {payment_date}")
+
+        # Create and validate payment object
         db_payment = Payment(
-            amount=payment_data.amount,
+            amount=float(payment_data.amount),
             mode=mode,
             status=PaymentStatus.COMPLETED,
             reference_number=payment_data.referenceNumber,
@@ -71,14 +119,30 @@ def create_payment(
             payment_date=payment_date
         )
         
+        print("Adding payment to session")
         session.add(db_payment)
+        
+        print("Committing transaction")
         session.commit()
+        
+        print("Refreshing payment object")
         session.refresh(db_payment)
         
-        return db_payment
-    except HTTPException:
+        # Create response with leader name
+        payment_dict = db_payment.model_dump()
+        payment_dict["leaderName"] = client.name
+        # Convert enum values to strings
+        payment_dict["status"] = db_payment.status.value if hasattr(db_payment.status, 'value') else str(db_payment.status)
+        payment_dict["mode"] = db_payment.mode.value if hasattr(db_payment.mode, 'value') else str(db_payment.mode)
+        
+        print(f"Payment created successfully with ID: {db_payment.id}")
+        return PaymentRead(**payment_dict)
+        
+    except HTTPException as he:
+        print(f"HTTP Exception in payment creation: {str(he)}")
         raise
     except Exception as e:
+        print(f"Error in payment creation: {str(e)}")
         session.rollback()
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
