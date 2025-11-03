@@ -35,7 +35,17 @@ def get_payments(
         
         for payment, client in results:
             payment_dict = payment.model_dump()
-            payment_dict["leaderName"] = client.name if client else None
+            # Add complete client data
+            if client:
+                payment_dict["client"] = {
+                    "id": client.id,
+                    "name": client.name,
+                    "type": client.type.value if hasattr(client.type, 'value') else str(client.type),
+                    "contact": client.contact,
+                    "address": client.address
+                }
+            else:
+                payment_dict["client"] = None
             # Convert enum values to strings
             payment_dict["status"] = payment.status.value if hasattr(payment.status, 'value') else str(payment.status)
             payment_dict["mode"] = payment.mode.value if hasattr(payment.mode, 'value') else str(payment.mode)
@@ -131,9 +141,15 @@ def create_payment(
         print("Refreshing payment object")
         session.refresh(db_payment)
         
-        # Create response with leader name
+        # Create response with complete client data
         payment_dict = db_payment.model_dump()
-        payment_dict["leaderName"] = client.name
+        payment_dict["client"] = {
+            "id": client.id,
+            "name": client.name,
+            "type": client.type.value if hasattr(client.type, 'value') else str(client.type),
+            "contact": client.contact,
+            "address": client.address
+        }
         # Convert enum values to strings
         payment_dict["status"] = db_payment.status.value if hasattr(db_payment.status, 'value') else str(db_payment.status)
         payment_dict["mode"] = db_payment.mode.value if hasattr(db_payment.mode, 'value') else str(db_payment.mode)

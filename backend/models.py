@@ -193,6 +193,13 @@ class PaymentCreate(SQLModel):
             }
         }
 
+class ClientInfo(SQLModel):
+    id: UUID
+    name: str
+    type: str
+    contact: str
+    address: str
+
 class PaymentRead(SQLModel):
     id: UUID
     amount: float
@@ -203,7 +210,7 @@ class PaymentRead(SQLModel):
     leaderId: UUID = PydanticField(..., alias="client_id")
     orderId: Optional[UUID] = PydanticField(None, alias="order_id")
     referenceNumber: Optional[str] = PydanticField(None, alias="reference_number")
-    leaderName: Optional[str] = None
+    client: Optional[ClientInfo] = None
 
     class Config:
         from_attributes = True

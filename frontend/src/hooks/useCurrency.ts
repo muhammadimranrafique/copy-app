@@ -14,7 +14,7 @@ export function useCurrency() {
   }, []);
 
   const formatCurrency = (amount: number): string => {
-    return `${currencySymbol}${amount.toLocaleString()}`;
+    return `${currencySymbol} ${amount.toLocaleString('en-PK', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
   };
 
   const updateCurrency = (symbol: string, code: string) => {
