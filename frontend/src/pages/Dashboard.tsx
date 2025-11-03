@@ -60,16 +60,16 @@ export default function Dashboard() {
   }
 
   return (
-    <div className="p-8 space-y-6">
+    <div className="p-4 sm:p-6 lg:p-8 space-y-4 sm:space-y-6">
       <div>
-        <h1 className="text-3xl font-bold">Dashboard</h1>
-        <p className="text-muted-foreground">Welcome back! Here's your business overview.</p>
+        <h1 className="text-2xl sm:text-3xl font-bold">Dashboard</h1>
+        <p className="text-sm sm:text-base text-muted-foreground">Welcome back! Here's your business overview.</p>
       </div>
 
       {showWelcome && <WelcomeAlert />}
 
       {/* Stats Grid */}
-      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
+      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3 sm:gap-4">
         <StatCard
           title="Total Orders"
           value={data?.totalOrders || 0}
@@ -97,25 +97,25 @@ export default function Dashboard() {
       </div>
 
       {/* Recent Orders and Payments */}
-      <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+      <div className="grid grid-cols-1 lg:grid-cols-2 gap-4 sm:gap-6">
         <Card>
           <CardHeader>
             <CardTitle>Recent Orders</CardTitle>
           </CardHeader>
           <CardContent>
-            <div className="space-y-3">
+            <div className="space-y-2 sm:space-y-3">
               {data?.recentOrders && data.recentOrders.length > 0 ? (
                 data.recentOrders.map((order: any) => (
-                  <div key={order.id} className="flex items-center justify-between p-3 rounded-lg border">
-                    <div>
-                      <p className="font-medium">{order.orderNumber}</p>
-                      <p className="text-sm text-muted-foreground">
+                  <div key={order.id} className="flex flex-col sm:flex-row sm:items-center justify-between p-3 sm:p-4 rounded-lg border gap-2 sm:gap-0 hover-lift">
+                    <div className="flex-1">
+                      <p className="font-medium text-sm sm:text-base">{order.orderNumber}</p>
+                      <p className="text-xs sm:text-sm text-muted-foreground">
                         {order.orderDate ? format(new Date(order.orderDate), 'MMM dd, yyyy') : 'N/A'}
                       </p>
                     </div>
-                    <div className="text-right">
-                      <p className="font-semibold">{formatCurrency(order.totalAmount || 0)}</p>
-                      <Badge variant={order.status === 'Paid' ? 'default' : 'secondary'}>
+                    <div className="flex items-center justify-between sm:flex-col sm:items-end gap-2">
+                      <p className="font-semibold text-base sm:text-lg">{formatCurrency(order.totalAmount || 0)}</p>
+                      <Badge variant={order.status === 'Paid' ? 'default' : 'secondary'} className="text-xs">
                         {order.status}
                       </Badge>
                     </div>
@@ -133,17 +133,17 @@ export default function Dashboard() {
             <CardTitle>Recent Payments</CardTitle>
           </CardHeader>
           <CardContent>
-            <div className="space-y-3">
+            <div className="space-y-2 sm:space-y-3">
               {data?.recentPayments && data.recentPayments.length > 0 ? (
                 data.recentPayments.map((payment: any) => (
-                  <div key={payment.id} className="flex items-center justify-between p-3 rounded-lg border">
-                    <div>
-                      <p className="font-medium">{payment.method}</p>
-                      <p className="text-sm text-muted-foreground">
+                  <div key={payment.id} className="flex flex-col sm:flex-row sm:items-center justify-between p-3 sm:p-4 rounded-lg border gap-2 sm:gap-0 hover-lift">
+                    <div className="flex-1">
+                      <p className="font-medium text-sm sm:text-base">{payment.method}</p>
+                      <p className="text-xs sm:text-sm text-muted-foreground">
                         {payment.paymentDate ? format(new Date(payment.paymentDate), 'MMM dd, yyyy') : 'N/A'}
                       </p>
                     </div>
-                    <p className="font-semibold text-green-600">{formatCurrency(payment.amount || 0)}</p>
+                    <p className="font-semibold text-base sm:text-lg text-green-600">{formatCurrency(payment.amount || 0)}</p>
                   </div>
                 ))
               ) : (

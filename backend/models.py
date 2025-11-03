@@ -134,7 +134,7 @@ class OrderRead(SQLModel):
     orderNumber: str = PydanticField(..., alias="order_number")
     leaderId: UUID = PydanticField(..., alias="client_id")
     totalAmount: float = PydanticField(..., alias="total_amount")
-    status: str = PydanticField(..., alias="status")  # Use str to ensure enum values are serialized
+    status: str = PydanticField(..., alias="status")
     orderDate: datetime = PydanticField(..., alias="order_date")
     createdAt: datetime = PydanticField(..., alias="created_at")
     leaderName: Optional[str] = None
@@ -143,9 +143,9 @@ class OrderRead(SQLModel):
         from_attributes = True
         populate_by_name = True
         json_encoders = {
-            UUID: str,  # Ensure UUIDs are properly serialized
-            datetime: lambda dt: dt.isoformat(),  # Format datetime as ISO string
-            OrderStatus: lambda s: s.value  # Convert enum to string
+            UUID: str,
+            datetime: lambda dt: dt.isoformat(),
+            OrderStatus: lambda s: s.value if hasattr(s, 'value') else str(s)
         }
 
 # Payment Models

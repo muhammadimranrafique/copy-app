@@ -68,20 +68,20 @@ export default function Leaders() {
   );
 
   return (
-    <div className="p-8 space-y-6">
-      <div className="flex items-center justify-between">
+    <div className="p-4 sm:p-6 lg:p-8 space-y-4 sm:space-y-6">
+      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 sm:gap-0">
         <div>
-          <h1 className="text-3xl font-bold">Leaders</h1>
-          <p className="text-muted-foreground">Manage schools and dealers</p>
+          <h1 className="text-2xl sm:text-3xl font-bold">Leaders</h1>
+          <p className="text-sm sm:text-base text-muted-foreground">Manage schools and dealers</p>
         </div>
         <Dialog open={dialogOpen} onOpenChange={setDialogOpen}>
           <DialogTrigger asChild>
-            <Button>
+            <Button className="w-full sm:w-auto">
               <Plus className="w-4 h-4 mr-2" />
               Add Leader
             </Button>
           </DialogTrigger>
-          <DialogContent>
+          <DialogContent className="max-w-[95vw] sm:max-w-[425px] max-h-[90vh] overflow-y-auto">
             <DialogHeader>
               <DialogTitle>Add New Leader</DialogTitle>
             </DialogHeader>
@@ -149,35 +149,35 @@ export default function Leaders() {
       </div>
 
       {loading ? (
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3 sm:gap-4">
           {[1, 2, 3].map((i) => (
             <div key={i} className="h-48 bg-muted rounded-lg animate-pulse"></div>
           ))}
         </div>
       ) : (
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3 sm:gap-4">
           {filteredLeaders.map((leader) => (
-            <Card key={leader.id}>
-              <CardHeader>
-                <div className="flex items-start justify-between">
-                  <CardTitle className="text-lg">{leader.name}</CardTitle>
-                  <Badge variant={leader.type === 'School' ? 'default' : 'secondary'}>
+            <Card key={leader.id} className="card-hover">
+              <CardHeader className="pb-3">
+                <div className="flex items-start justify-between gap-2">
+                  <CardTitle className="text-base sm:text-lg flex-1 min-w-0 break-words">{leader.name}</CardTitle>
+                  <Badge variant={leader.type === 'School' ? 'default' : 'secondary'} className="text-xs flex-shrink-0">
                     {leader.type}
                   </Badge>
                 </div>
               </CardHeader>
-              <CardContent className="space-y-2">
+              <CardContent className="space-y-2 pt-3">
                 <div>
-                  <p className="text-sm text-muted-foreground">Contact</p>
-                  <p className="font-medium">{leader.contact || 'N/A'}</p>
+                  <p className="text-xs sm:text-sm text-muted-foreground">Contact</p>
+                  <p className="font-medium text-sm sm:text-base break-words">{leader.contact || 'N/A'}</p>
                 </div>
                 <div>
-                  <p className="text-sm text-muted-foreground">Address</p>
-                  <p className="font-medium">{leader.address || 'N/A'}</p>
+                  <p className="text-xs sm:text-sm text-muted-foreground">Address</p>
+                  <p className="font-medium text-sm sm:text-base break-words">{leader.address || 'N/A'}</p>
                 </div>
                 <div>
-                  <p className="text-sm text-muted-foreground">Balance</p>
-                  <p className={`font-semibold ${(leader.openingBalance || 0) >= 0 ? 'text-green-600' : 'text-red-600'}`}>
+                  <p className="text-xs sm:text-sm text-muted-foreground">Balance</p>
+                  <p className={`font-semibold text-sm sm:text-base ${(leader.openingBalance || 0) >= 0 ? 'text-green-600' : 'text-red-600'}`}>
                     {formatCurrency(leader.openingBalance || 0)}
                   </p>
                 </div>

@@ -64,22 +64,22 @@ export default function Settings() {
   };
 
   return (
-    <div className="p-8 space-y-6">
+    <div className="p-4 sm:p-6 lg:p-8 space-y-4 sm:space-y-6">
       <div>
-        <h1 className="text-3xl font-bold">Settings</h1>
-        <p className="text-muted-foreground">Manage your business settings and preferences</p>
+        <h1 className="text-2xl sm:text-3xl font-bold">Settings</h1>
+        <p className="text-sm sm:text-base text-muted-foreground">Manage your business settings and preferences</p>
       </div>
 
-      <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+      <div className="grid grid-cols-1 lg:grid-cols-2 gap-4 sm:gap-6">
         {/* Business Information */}
-        <Card>
+        <Card className="card-hover">
           <CardHeader>
-            <CardTitle className="flex items-center gap-2">
-              <Building2 className="w-5 h-5" />
+            <CardTitle className="flex items-center gap-2 text-lg sm:text-xl">
+              <Building2 className="w-4 h-4 sm:w-5 sm:h-5" />
               Business Information
             </CardTitle>
           </CardHeader>
-          <CardContent className="space-y-4">
+          <CardContent className="space-y-3 sm:space-y-4">
             <div>
               <Label htmlFor="businessName">Business Name</Label>
               <Input
@@ -148,14 +148,14 @@ export default function Settings() {
         </Card>
 
         {/* Currency & Regional Settings */}
-        <Card>
+        <Card className="card-hover">
           <CardHeader>
-            <CardTitle className="flex items-center gap-2">
-              <Globe className="w-5 h-5" />
+            <CardTitle className="flex items-center gap-2 text-lg sm:text-xl">
+              <Globe className="w-4 h-4 sm:w-5 sm:h-5" />
               Currency & Regional Settings
             </CardTitle>
           </CardHeader>
-          <CardContent className="space-y-4">
+          <CardContent className="space-y-3 sm:space-y-4">
             <div>
               <Label htmlFor="currency">Currency</Label>
               <Select 
@@ -241,12 +241,12 @@ export default function Settings() {
       </div>
 
       {/* App Information */}
-      <Card>
+      <Card className="card-hover">
         <CardHeader>
-          <CardTitle>Application Information</CardTitle>
+          <CardTitle className="text-lg sm:text-xl">Application Information</CardTitle>
         </CardHeader>
         <CardContent>
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+          <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 sm:gap-4">
             <div className="space-y-1">
               <p className="text-sm text-muted-foreground">Version</p>
               <p className="text-lg font-semibold">1.0.0</p>
