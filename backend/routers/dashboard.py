@@ -1,7 +1,8 @@
 from fastapi import APIRouter, Depends, HTTPException, status
 from sqlmodel import Session, select
+from sqlalchemy.orm import selectinload, joinedload
 from database import get_session
-from models import Order, Payment, Expense, User
+from models import Order, Payment, Expense, User, Client
 from utils.auth import get_current_user
 from datetime import datetime, timedelta
 from typing import Optional
@@ -29,11 +30,15 @@ def get_dashboard_stats(
         else:
             end = datetime.now()
         
-        # Get all orders
-        orders = session.exec(select(Order)).all()
+        # Get all orders with client relationship
+        orders = session.exec(
+            select(Order).options(joinedload(Order.client))
+        ).all()
         
-        # Get all payments
-        payments = session.exec(select(Payment)).all()
+        # Get all payments with client relationship
+        payments = session.exec(
+            select(Payment).options(joinedload(Payment.client))
+        ).all()
         
         # Get all expenses
         expenses = session.exec(select(Expense)).all()
@@ -48,11 +53,45 @@ def get_dashboard_stats(
         # Get pending orders
         pending_orders = [o for o in orders if o.status == "Pending"]
         
-        # Get recent orders (last 5)
-        recent_orders = sorted(orders, key=lambda x: x.created_at, reverse=True)[:5]
+        # Get recent orders (last 5) with client info
+        recent_orders_raw = sorted(orders, key=lambda x: x.created_at, reverse=True)[:5]
+        recent_orders = []
+        for order in recent_orders_raw:
+            order_dict = {
+                "id": str(order.id),
+                "orderNumber": order.order_number,
+                "leaderId": str(order.client_id),
+                "totalAmount": order.total_amount,
+                "status": order.status,
+                "orderDate": order.order_date.isoformat(),
+                "createdAt": order.created_at.isoformat(),
+                "leaderName": order.client.name if order.client else "N/A"
+            }
+            recent_orders.append(order_dict)
         
-        # Get recent payments (last 5)
-        recent_payments = sorted(payments, key=lambda x: x.created_at, reverse=True)[:5]
+        # Get recent payments (last 5) with client info
+        recent_payments_raw = sorted(payments, key=lambda x: x.created_at, reverse=True)[:5]
+        recent_payments = []
+        for payment in recent_payments_raw:
+            payment_dict = {
+                "id": str(payment.id),
+                "amount": payment.amount,
+                "method": payment.mode.value if hasattr(payment.mode, 'value') else str(payment.mode),
+                "status": payment.status.value if hasattr(payment.status, 'value') else str(payment.status),
+                "paymentDate": payment.payment_date.isoformat(),
+                "createdAt": payment.created_at.isoformat(),
+                "leaderId": str(payment.client_id),
+                "orderId": str(payment.order_id) if payment.order_id else None,
+                "referenceNumber": payment.reference_number,
+                "client": {
+                    "id": str(payment.client.id),
+                    "name": payment.client.name,
+                    "type": payment.client.type.value if hasattr(payment.client.type, 'value') else str(payment.client.type),
+                    "contact": payment.client.contact,
+                    "address": payment.client.address
+                } if payment.client else None
+            }
+            recent_payments.append(payment_dict)
         
         return {
             "totalOrders": total_orders,

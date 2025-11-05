@@ -7,7 +7,7 @@ from reportlab.lib.enums import TA_CENTER, TA_LEFT, TA_RIGHT
 import qrcode
 import io
 from datetime import datetime
-from typing import Dict, Any
+from typing import Dict, Any, Optional
 from config import get_settings
 import os
 
@@ -18,8 +18,8 @@ class InvoiceGenerator:
         self.invoice_dir = settings.invoice_dir
         os.makedirs(self.invoice_dir, exist_ok=True)
     
-    def generate_invoice(self, order_data: Dict[str, Any], client_data: Dict[str, Any]) -> str:
-        """Generate an invoice PDF for an order."""
+    def generate_invoice(self, order_data: Dict[str, Any], client_data: Dict[str, Any], company_settings: Optional[Dict[str, Any]] = None) -> str:
+        """Generate an invoice PDF for an order with dynamic company branding."""
         invoice_number = order_data.get('order_number', '')
         invoice_date = datetime.now().strftime('%Y-%m-%d')
         
@@ -42,16 +42,23 @@ class InvoiceGenerator:
             alignment=TA_CENTER
         )
         
+        # Use dynamic settings from database or fallback to config
+        company_name = (company_settings or {}).get('company_name', settings.company_name)
+        company_address = (company_settings or {}).get('company_address', settings.company_address)
+        company_phone = (company_settings or {}).get('company_phone', settings.company_phone)
+        company_email = (company_settings or {}).get('company_email', settings.company_email)
+        currency_symbol = (company_settings or {}).get('currency_symbol', 'Rs')
+        
         # Header
-        header_text = f"<b>{settings.company_name}</b>"
+        header_text = f"<b>{company_name}</b>"
         story.append(Paragraph(header_text, title_style))
         story.append(Spacer(1, 0.3*inch))
         
         # Company Info
         company_info = f"""
-        <b>Address:</b> {settings.company_address}<br/>
-        <b>Phone:</b> {settings.company_phone}<br/>
-        <b>Email:</b> {settings.company_email}
+        <b>Address:</b> {company_address}<br/>
+        <b>Phone:</b> {company_phone}<br/>
+        <b>Email:</b> {company_email}
         """
         story.append(Paragraph(company_info, styles['Normal']))
         story.append(Spacer(1, 0.5*inch))
@@ -146,7 +153,7 @@ class InvoiceGenerator:
             ('GRID', (0, 0), (-1, -1), 1, colors.black)
         ]))
         
-        story.append(Paragraph('<i>All amounts in PKR</i>', styles['Italic']))
+        story.append(Paragraph(f'<i>All amounts in {currency_symbol}</i>', styles['Italic']))
         story.append(Spacer(1, 0.2*inch))
         story.append(totals_table)
         story.append(Spacer(1, 0.5*inch))
@@ -171,12 +178,14 @@ class InvoiceGenerator:
         
         story.append(Spacer(1, 0.3*inch))
         
-        # Footer
-        footer_text = """
-        <i>Thank you for your business!<br/>
-        For any queries, please contact us at the above mentioned details.</i>
+        # Footer with company details
+        footer_text = f"""
+        <b>{company_name}</b><br/>
+        <i>Address: {company_address}<br/>
+        Phone: {company_phone} | Email: {company_email}<br/>
+        Thank you for your business!</i>
         """
-        story.append(Paragraph(footer_text, styles['Italic']))
+        story.append(Paragraph(footer_text, ParagraphStyle('Footer', parent=styles['Normal'], alignment=TA_CENTER, fontSize=9)))
         
         # Build PDF
         doc.build(story)

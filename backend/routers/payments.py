@@ -4,7 +4,7 @@ from sqlmodel import Session, select
 from typing import List
 from datetime import datetime
 from database import get_session
-from models import Payment, PaymentCreate, PaymentRead, Order, User, PaymentStatus, PaymentMode, Client
+from models import Payment, PaymentCreate, PaymentRead, Order, User, PaymentStatus, PaymentMode, Client, Settings
 from utils.auth import get_current_user
 from sqlalchemy.orm import joinedload
 from services.payment_receipt_generator import payment_receipt_generator
@@ -286,12 +286,26 @@ def generate_payment_receipt(
             "address": client.address,
         }
 
+        # Get company settings from database
+        settings_statement = select(Settings)
+        company_settings_obj = session.exec(settings_statement).first()
+        company_settings = None
+        if company_settings_obj:
+            company_settings = {
+                "company_name": company_settings_obj.company_name,
+                "company_email": company_settings_obj.company_email,
+                "company_phone": company_settings_obj.company_phone,
+                "company_address": company_settings_obj.company_address,
+                "currency_symbol": company_settings_obj.currency_symbol
+            }
+
         print(f"Generating receipt for payment {payment_id}")
         print(f"Payment data: {payment_data}")
         print(f"Client data: {client_data}")
+        print(f"Company settings: {company_settings}")
 
         # Generate the PDF receipt
-        receipt_path = payment_receipt_generator.generate_receipt(payment_data, client_data)
+        receipt_path = payment_receipt_generator.generate_receipt(payment_data, client_data, company_settings)
 
         if not os.path.exists(receipt_path):
             raise HTTPException(

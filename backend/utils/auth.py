@@ -3,14 +3,15 @@ from typing import Optional
 from jose import JWTError, jwt
 from passlib.context import CryptContext
 from sqlmodel import Session, select
-from fastapi import Depends, HTTPException
-from fastapi.security import OAuth2PasswordBearer
+from fastapi import Depends, HTTPException, status
+from fastapi.security import OAuth2PasswordBearer, HTTPBearer, HTTPAuthorizationCredentials
 from models import User
 from config import get_settings
 from uuid import UUID
 
 settings = get_settings()
 oauth2_scheme = OAuth2PasswordBearer(tokenUrl="/api/v1/auth/login")
+bearer_scheme = HTTPBearer()
 
 """
 Use sha256_crypt as a fallback/default for environments where bcrypt
@@ -53,7 +54,7 @@ def authenticate_user(session: Session, email: str, password: str) -> Optional[U
 def get_current_user(token: str = Depends(oauth2_scheme)) -> User:
     """Get current user from JWT token."""
     credentials_exception = HTTPException(
-        status_code=401,
+        status_code=status.HTTP_401_UNAUTHORIZED,
         detail="Could not validate credentials",
         headers={"WWW-Authenticate": "Bearer"},
     )
@@ -63,17 +64,35 @@ def get_current_user(token: str = Depends(oauth2_scheme)) -> User:
         user_id: str = payload.get("sub")
         if user_id is None:
             raise credentials_exception
-    except JWTError:
+    except JWTError as e:
+        print(f"JWT Error: {e}")
+        raise credentials_exception
+    except Exception as e:
+        print(f"Token validation error: {e}")
         raise credentials_exception
     
     # Get session from generator
     from database import engine
     with Session(engine) as session:
-        statement = select(User).where(User.id == UUID(user_id))
-        user = session.exec(statement).first()
-        
-        if user is None:
+        try:
+            statement = select(User).where(User.id == UUID(user_id))
+            user = session.exec(statement).first()
+            
+            if user is None:
+                raise credentials_exception
+            
+            if not user.is_active:
+                raise HTTPException(
+                    status_code=status.HTTP_403_FORBIDDEN,
+                    detail="User account is inactive"
+                )
+            
+            return user
+        except Exception as e:
+            print(f"Database error in get_current_user: {e}")
             raise credentials_exception
-        
-        return user
+
+def get_current_user_from_bearer(credentials: HTTPAuthorizationCredentials = Depends(bearer_scheme)) -> User:
+    """Get current user from Bearer token (alternative method for Swagger UI)."""
+    return get_current_user(credentials.credentials)
 
