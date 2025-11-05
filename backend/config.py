@@ -3,7 +3,7 @@ from functools import lru_cache
 
 class Settings(BaseSettings):
     # Database
-    database_url: str = "postgresql://postgres:password@localhost:5432/schoolcopy_db"
+    database_url: str
     
     # JWT
     secret_key: str = "your-secret-key-change-this-in-production"

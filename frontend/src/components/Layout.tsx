@@ -5,6 +5,7 @@ import { useAuth } from '@/lib/useAuth';
 import { Button } from '@/components/ui/button';
 import { Avatar, AvatarFallback } from '@/components/ui/avatar';
 import { useState, useEffect } from 'react';
+import { api } from '@/lib/api-client';
 
 const navItems = [
   { path: '/', label: 'Dashboard', icon: LayoutDashboard },
@@ -20,6 +21,22 @@ export default function Layout({ children }: { children: React.ReactNode }) {
   const location = useLocation();
   const { user, logout } = useAuth();
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
+  const [companyName, setCompanyName] = useState('SchoolCopy');
+
+  // Fetch company settings
+  useEffect(() => {
+    const fetchSettings = async () => {
+      try {
+        const settings = await api.getSettings();
+        if (settings?.company_name) {
+          setCompanyName(settings.company_name);
+        }
+      } catch (error) {
+        console.error('Failed to load company settings:', error);
+      }
+    };
+    fetchSettings();
+  }, []);
 
   // Close mobile menu on route change
   useEffect(() => {
@@ -56,7 +73,7 @@ export default function Layout({ children }: { children: React.ReactNode }) {
       {/* Mobile Header */}
       <div className="md:hidden fixed top-0 left-0 right-0 z-50 bg-card border-b px-4 py-3 flex items-center justify-between">
         <div className="flex items-center gap-2">
-          <h1 className="text-xl font-bold bg-gradient-to-r from-primary to-primary/70 bg-clip-text text-transparent">SchoolCopy</h1>
+          <h1 className="text-xl font-bold bg-gradient-to-r from-primary to-primary/70 bg-clip-text text-transparent">{companyName}</h1>
         </div>
         <Button
           variant="ghost"
@@ -88,7 +105,7 @@ export default function Layout({ children }: { children: React.ReactNode }) {
         <div className="p-6 gradient-bg">
           <div className="flex items-center justify-between">
             <div>
-              <h1 className="text-2xl font-bold text-white">SchoolCopy</h1>
+              <h1 className="text-2xl font-bold text-white">{companyName}</h1>
               <p className="text-sm text-white/80">Business Manager</p>
             </div>
             <Button

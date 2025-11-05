@@ -182,7 +182,7 @@ class PaymentCreate(SQLModel):
     orderId: Optional[UUID] = None
 
     class Config:
-        schema_extra = {
+        json_schema_extra = {
             "example": {
                 "amount": 1000.0,
                 "method": "Bank Transfer",
@@ -287,3 +287,41 @@ class UserRead(UserBase):
     id: UUID
     is_active: bool
     created_at: datetime
+
+# Settings Model
+
+# Settings Model
+class SettingsBase(SQLModel):
+    company_name: str = "School Copy Manufacturing"
+    company_email: str = "info@schoolcopy.com"
+    company_phone: str = "+92 300 1234567"
+    company_address: str = "123 Business Street, Karachi"
+    currency_code: str = "PKR"
+    currency_symbol: str = "Rs"
+    timezone: str = "Asia/Karachi"
+    date_format: str = "DD/MM/YYYY"
+
+class Settings(SettingsBase, table=True):
+    __tablename__ = "settings"
+    
+    id: UUID = Field(default_factory=uuid4, primary_key=True)
+    updated_at: datetime = Field(default_factory=datetime.utcnow)
+    created_at: datetime = Field(default_factory=datetime.utcnow)
+
+class SettingsUpdate(SQLModel):
+    company_name: Optional[str] = None
+    company_email: Optional[str] = None
+    company_phone: Optional[str] = None
+    company_address: Optional[str] = None
+    currency_code: Optional[str] = None
+    currency_symbol: Optional[str] = None
+    timezone: Optional[str] = None
+    date_format: Optional[str] = None
+
+class SettingsRead(SettingsBase):
+    id: UUID
+    updated_at: datetime
+    created_at: datetime
+
+    class Config:
+        from_attributes = True

@@ -1,5 +1,5 @@
 from fastapi import APIRouter, Depends, HTTPException, status
-from fastapi.security import OAuth2PasswordBearer, OAuth2PasswordRequestForm
+from fastapi.security import OAuth2PasswordBearer, OAuth2PasswordRequestForm, HTTPBearer
 from sqlmodel import Session, select
 from datetime import timedelta
 from database import get_session
@@ -12,6 +12,7 @@ import re
 router = APIRouter(prefix="/auth", tags=["Authentication"])
 settings = get_settings()
 oauth2_scheme = OAuth2PasswordBearer(tokenUrl="/api/v1/auth/login")
+bearer_scheme = HTTPBearer()
 
 @router.post("/register", response_model=UserRead, status_code=status.HTTP_201_CREATED)
 def register(user_data: UserCreate, session: Session = Depends(get_session)):
@@ -57,7 +58,7 @@ def register(user_data: UserCreate, session: Session = Depends(get_session)):
     
     return db_user
 
-@router.post("/login")
+@router.post("/login", summary="Login for access token", description="Login with email and password to get JWT access token")
 def login(form_data: OAuth2PasswordRequestForm = Depends(), session: Session = Depends(get_session)):
     """Login and get access token."""
     user = authenticate_user(session, form_data.username, form_data.password)
@@ -97,12 +98,12 @@ def logout():
     """Logout user."""
     return {"message": "Successfully logged out"}
 
-@router.get("/me", response_model=UserRead)
+@router.get("/me", response_model=UserRead, dependencies=[Depends(bearer_scheme)])
 def get_me(current_user: User = Depends(get_current_user)):
     """Get current user information."""
     return current_user
 
-@router.post("/refresh-token")
+@router.post("/refresh-token", dependencies=[Depends(bearer_scheme)])
 def refresh_token(current_user: User = Depends(get_current_user), session: Session = Depends(get_session)):
     """Refresh access token."""
     if not current_user.is_active:
@@ -143,7 +144,7 @@ def reset_password(token: str, new_password: str, session: Session = Depends(get
     # TODO: Implement token verification and password reset logic
     return {"message": "Password reset functionality coming soon"}
 
-@router.get("/verify-token")
+@router.get("/verify-token", dependencies=[Depends(bearer_scheme)])
 def verify_token(current_user: User = Depends(get_current_user)):
     """Verify if token is valid."""
     return {

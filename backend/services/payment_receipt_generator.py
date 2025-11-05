@@ -8,7 +8,7 @@ from reportlab.pdfgen import canvas
 import qrcode
 import io
 from datetime import datetime
-from typing import Dict, Any
+from typing import Dict, Any, Optional
 from config import get_settings
 import os
 
@@ -39,13 +39,14 @@ class ProfessionalInvoiceGenerator:
         self.text_light = colors.HexColor('#64748b')
         self.border = colors.HexColor('#cbd5e1')
     
-    def _create_premium_header(self, story, styles, receipt_number: str, payment_data: Dict[str, Any]):
+    def _create_premium_header(self, story, styles, receipt_number: str, payment_data: Dict[str, Any], company_settings: Optional[Dict[str, Any]] = None):
         """Create professional header with full width utilization."""
+        company_name = company_settings.get('company_name', settings.company_name) if company_settings else settings.company_name
         
         header_content = [
             [
                 Paragraph(
-                    f'<b><font size=24 color=#1e40af>{settings.company_name}</font></b><br/>'
+                    f'<b><font size=24 color=#1e40af>{company_name}</font></b><br/>'
                     f'<font size=10 color=#64748b>Professional Manufacturing Solutions</font>',
                     ParagraphStyle('CompanyInfo', parent=styles['Normal'], leading=18)
                 ),
@@ -161,14 +162,15 @@ class ProfessionalInvoiceGenerator:
         story.append(combined_table)
         story.append(Spacer(1, 6*mm))
     
-    def _create_amount_spotlight(self, story, styles, payment_data: Dict[str, Any]):
+    def _create_amount_spotlight(self, story, styles, payment_data: Dict[str, Any], company_settings: Optional[Dict[str, Any]] = None):
         """Create prominent amount display with professional styling."""
         amount = payment_data.get('amount', 0)
+        currency_symbol = (company_settings or {}).get('currency_symbol', 'Rs')
         
         amount_content = [
             [Paragraph('<font size=14 color=#1e40af><b>TOTAL AMOUNT RECEIVED</b></font>', 
                       ParagraphStyle('AL', parent=styles['Normal'], alignment=TA_CENTER))],
-            [Paragraph(f'<b><font size=48 color=#10b981>Rs. {amount:,.2f}</font></b>', 
+            [Paragraph(f'<b><font size=48 color=#10b981>{currency_symbol} {amount:,.2f}</font></b>', 
                       ParagraphStyle('AV', parent=styles['Normal'], alignment=TA_CENTER))],
             [Paragraph('<font size=10 color=#64748b>Payment Successfully Processed & Confirmed</font>', 
                       ParagraphStyle('AS', parent=styles['Normal'], alignment=TA_CENTER))],
@@ -248,14 +250,19 @@ class ProfessionalInvoiceGenerator:
                 ParagraphStyle('TY', parent=styles['Normal'], alignment=TA_CENTER)
             ))
     
-    def _create_inline_footer(self, story, styles):
+    def _create_inline_footer(self, story, styles, company_settings: Optional[Dict[str, Any]] = None):
         """Create professional inline footer section."""
         story.append(Spacer(1, 10*mm))
+        
+        company_name = company_settings.get('company_name', settings.company_name) if company_settings else settings.company_name
+        company_phone = company_settings.get('company_phone', settings.company_phone) if company_settings else settings.company_phone
+        company_email = company_settings.get('company_email', settings.company_email) if company_settings else settings.company_email
+        company_address = company_settings.get('company_address', settings.company_address) if company_settings else settings.company_address
         
         # Professional footer with enhanced design
         footer_content = [
             [Paragraph(
-                f'<b><font size=12 color=#1e40af>{settings.company_name}</font></b>',
+                f'<b><font size=12 color=#1e40af>{company_name}</font></b>',
                 ParagraphStyle('CompanyName', parent=styles['Normal'], alignment=TA_CENTER)
             )],
             [Paragraph(
@@ -263,7 +270,7 @@ class ProfessionalInvoiceGenerator:
                 ParagraphStyle('Tagline', parent=styles['Normal'], alignment=TA_CENTER)
             )],
             [Paragraph(
-                f'<font size=8 color=#64748b>📞 {settings.company_phone} | ✉️ {settings.company_email} | 🏭 Manufacturing District</font>',
+                f'<font size=8 color=#64748b>📞 {company_phone} | ✉️ {company_email} | 📍 {company_address}</font>',
                 ParagraphStyle('Contact', parent=styles['Normal'], alignment=TA_CENTER)
             )],
             [Paragraph(
@@ -293,7 +300,8 @@ class ProfessionalInvoiceGenerator:
     def generate_receipt(
         self,
         payment_data: Dict[str, Any],
-        client_data: Dict[str, Any]
+        client_data: Dict[str, Any],
+        company_settings: Optional[Dict[str, Any]] = None
     ) -> str:
         """
         Generate a professional A4 single-page payment receipt PDF.
@@ -346,11 +354,11 @@ class ProfessionalInvoiceGenerator:
         styles = getSampleStyleSheet()
 
         # Build premium single-page receipt
-        self._create_premium_header(story, styles, receipt_number, payment_data)
+        self._create_premium_header(story, styles, receipt_number, payment_data, company_settings)
         self._create_info_section(story, styles, payment_data, client_data)
-        self._create_amount_spotlight(story, styles, payment_data)
+        self._create_amount_spotlight(story, styles, payment_data, company_settings)
         self._create_qr_and_thankyou(story, styles, payment_data)
-        self._create_inline_footer(story, styles)
+        self._create_inline_footer(story, styles, company_settings)
 
         # Build PDF
         doc.build(story)

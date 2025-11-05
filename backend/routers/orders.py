@@ -2,7 +2,7 @@ from fastapi import APIRouter, Depends, HTTPException, status
 from sqlmodel import Session, select
 from typing import List
 from database import get_session
-from models import Order, OrderCreate, OrderRead, Client, User, OrderStatus
+from models import Order, OrderCreate, OrderRead, Client, User, OrderStatus, Settings
 from utils.auth import get_current_user
 from services.invoice_generator import invoice_generator
 import os
@@ -280,7 +280,20 @@ def generate_invoice(
         "address": client.address
     }
     
-    invoice_path = invoice_generator.generate_invoice(order_dict, client_dict)
+    # Get company settings
+    settings_statement = select(Settings)
+    company_settings = session.exec(settings_statement).first()
+    settings_dict = None
+    if company_settings:
+        settings_dict = {
+            "company_name": company_settings.company_name,
+            "company_address": company_settings.company_address,
+            "company_phone": company_settings.company_phone,
+            "company_email": company_settings.company_email,
+            "currency_symbol": company_settings.currency_symbol
+        }
+    
+    invoice_path = invoice_generator.generate_invoice(order_dict, client_dict, settings_dict)
     
     if os.path.exists(invoice_path):
         return FileResponse(

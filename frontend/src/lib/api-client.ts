@@ -5,6 +5,8 @@ import type {
   Product,
   Payment,
   DashboardData,
+  Settings,
+  SettingsUpdate,
   QueryParams,
   ApiResponse,
   ListResponse
@@ -209,7 +211,19 @@ class ApiClient {
 
   async getDashboardData(params?: QueryParams): Promise<DashboardData> {
     const qs = params ? `?${new URLSearchParams(params as any).toString()}` : '';
-    return await this.fetchJson<DashboardData>(`/dashboard/${qs}`);
+    return await this.fetchJson<DashboardData>(`/dashboard/stats${qs}`);
+  }
+
+  // Settings endpoints
+  async getSettings(): Promise<Settings> {
+    return await this.fetchJson<Settings>('/settings/');
+  }
+
+  async updateSettings(data: SettingsUpdate): Promise<Settings> {
+    return await this.fetchJson<Settings>('/settings/', {
+      method: 'PUT',
+      body: JSON.stringify(data),
+    });
   }
 }
 

@@ -1,6 +1,7 @@
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse
+from fastapi.security import OAuth2PasswordBearer
 from contextlib import asynccontextmanager
 from database import create_db_and_tables
 from models import *  # Import all models
@@ -50,8 +51,45 @@ async def root():
 async def health_check():
     return {"status": "healthy"}
 
+# Configure OpenAPI security scheme for Swagger UI
+def custom_openapi():
+    if app.openapi_schema:
+        return app.openapi_schema
+    
+    from fastapi.openapi.utils import get_openapi
+    openapi_schema = get_openapi(
+        title=app.title,
+        version=app.version,
+        description=app.description,
+        routes=app.routes,
+    )
+    
+    # Add security scheme for Bearer token
+    openapi_schema["components"]["securitySchemes"] = {
+        "BearerAuth": {
+            "type": "http",
+            "scheme": "bearer",
+            "bearerFormat": "JWT",
+            "description": "Enter your JWT token"
+        },
+        "OAuth2PasswordBearer": {
+            "type": "oauth2",
+            "flows": {
+                "password": {
+                    "tokenUrl": "/api/v1/auth/login",
+                    "scopes": {}
+                }
+            }
+        }
+    }
+    
+    app.openapi_schema = openapi_schema
+    return app.openapi_schema
+
+app.openapi = custom_openapi
+
 # Import and register routers
-from routers import auth, schools, products, orders, payments, expenses, dashboard, leaders
+from routers import auth, schools, products, orders, payments, expenses, dashboard, leaders, settings
 
 app.include_router(auth.router, prefix="/api/v1")
 app.include_router(schools.router, prefix="/api/v1")
@@ -61,6 +99,7 @@ app.include_router(orders.router, prefix="/api/v1")
 app.include_router(payments.router, prefix="/api/v1")
 app.include_router(expenses.router, prefix="/api/v1")
 app.include_router(dashboard.router, prefix="/api/v1")
+app.include_router(settings.router, prefix="/api/v1")
 
 if __name__ == "__main__":
     import uvicorn
