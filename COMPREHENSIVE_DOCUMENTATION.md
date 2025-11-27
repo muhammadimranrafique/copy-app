@@ -534,6 +534,731 @@ function useCurrency() {
       style: 'currency',
       currency: 'PKR',
       minimumFractionDigits: 0,
+      maximumFractionDigits: 2
+    }).format(amount);
+  };
+  
+  return { formatCurrency };
+}
+```
+
+**Error Boundary:**
+```typescript
+class ErrorBoundary extends Component {
+  state = { hasError: false, error: null };
+  
+  static getDerivedStateFromError(error: Error) {
+    return { hasError: true, error };
+  }
+  
+  render() {
+    if (this.state.hasError) {
+      return <ErrorFallback error={this.state.error} />;
+    }
+    return this.props.children;
+  }
+}
+```
+
+---
+
+## 3. Deployment Guide
+
+### 3.1 Prerequisites
+
+**System Requirements:**
+- Python 3.8+ (for backend)
+- Node.js 16+ (for frontend)
+- PostgreSQL 12+ (database)
+- Git (version control)
+
+**Development Tools:**
+- Code editor (VS Code recommended)
+- Terminal/Command prompt
+- Web browser (Chrome/Firefox)
+
+### 3.2 Local Development Setup
+
+#### Step 1: Clone Repository
+```bash
+git clone <repository-url>
+cd saleem_copy_app
+```
+
+#### Step 2: Backend Setup
+```bash
+# Navigate to backend directory
+cd backend
+
+# Create virtual environment
+python -m venv venv
+
+# Activate virtual environment
+# Windows:
+venv\Scripts\activate
+# macOS/Linux:
+source venv/bin/activate
+
+# Install dependencies
+pip install -r requirements.txt
+```
+
+#### Step 3: Database Setup
+```bash
+# Install PostgreSQL and create database
+psql -U postgres
+CREATE DATABASE schoolcopy_db;
+CREATE USER schoolcopy_user WITH PASSWORD 'your_password';
+GRANT ALL PRIVILEGES ON DATABASE schoolcopy_db TO schoolcopy_user;
+\q
+```
+
+#### Step 4: Environment Configuration
+```bash
+# Create .env file in backend directory
+cp .env.example .env
+
+# Edit .env with your settings:
+DATABASE_URL=postgresql://schoolcopy_user:your_password@localhost:5432/schoolcopy_db
+SECRET_KEY=your-super-secret-key-change-in-production
+ALGORITHM=HS256
+ACCESS_TOKEN_EXPIRE_MINUTES=30
+COMPANY_NAME=School Copy Manufacturing
+COMPANY_ADDRESS=123 Business Street, Karachi, Pakistan
+COMPANY_PHONE=+92 300 1234567
+INVOICE_DIR=./invoices
+```
+
+#### Step 5: Initialize Database
+```bash
+# Run database migrations
+python -m alembic upgrade head
+
+# Create initial admin user (optional)
+python create_admin.py
+```
+
+#### Step 6: Start Backend Server
+```bash
+# Development server with auto-reload
+uvicorn main:app --reload --host 0.0.0.0 --port 8000
+
+# Server will be available at: http://localhost:8000
+# API docs at: http://localhost:8000/docs
+```
+
+#### Step 7: Frontend Setup
+```bash
+# Open new terminal and navigate to frontend
+cd ../frontend
+
+# Install dependencies
+npm install
+
+# Create environment file
+cp .env.example .env.local
+
+# Edit .env.local:
+VITE_API_BASE_URL=http://127.0.0.1:8000/api/v1
+```
+
+#### Step 8: Start Frontend Development Server
+```bash
+# Start development server
+npm run dev
+
+# Frontend will be available at: http://localhost:5173
+```
+
+### 3.3 Production Deployment
+
+#### Option A: Docker Deployment (Recommended)
+
+**1. Create Docker Compose Configuration:**
+
+```yaml
+# docker-compose.prod.yml
+version: '3.8'
+
+services:
+  db:
+    image: postgres:15
+    environment:
+      POSTGRES_DB: schoolcopy_db
+      POSTGRES_USER: schoolcopy_user
+      POSTGRES_PASSWORD: ${DB_PASSWORD}
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    networks:
+      - app-network
+
+  backend:
+    build:
+      context: ./backend
+      dockerfile: Dockerfile.prod
+    environment:
+      DATABASE_URL: postgresql://schoolcopy_user:${DB_PASSWORD}@db:5432/schoolcopy_db
+      SECRET_KEY: ${SECRET_KEY}
+    depends_on:
+      - db
+    networks:
+      - app-network
+    volumes:
+      - ./invoices:/app/invoices
+
+  frontend:
+    build:
+      context: ./frontend
+      dockerfile: Dockerfile.prod
+    ports:
+      - "80:80"
+      - "443:443"
+    depends_on:
+      - backend
+    networks:
+      - app-network
+    volumes:
+      - ./ssl:/etc/nginx/ssl
+
+volumes:
+  postgres_data:
+
+networks:
+  app-network:
+    driver: bridge
+```
+
+**2. Backend Dockerfile:**
+
+```dockerfile
+# backend/Dockerfile.prod
+FROM python:3.11-slim
+
+WORKDIR /app
+
+# Install system dependencies
+RUN apt-get update && apt-get install -y \
+    gcc \
+    libpq-dev \
+    && rm -rf /var/lib/apt/lists/*
+
+# Copy requirements and install Python dependencies
+COPY requirements.txt .
+RUN pip install --no-cache-dir -r requirements.txt
+
+# Copy application code
+COPY . .
+
+# Create invoices directory
+RUN mkdir -p invoices
+
+# Expose port
+EXPOSE 8000
+
+# Run application
+CMD ["uvicorn", "main:app", "--host", "0.0.0.0", "--port", "8000"]
+```
+
+**3. Frontend Dockerfile:**
+
+```dockerfile
+# frontend/Dockerfile.prod
+# Build stage
+FROM node:18-alpine as build
+
+WORKDIR /app
+
+# Copy package files
+COPY package*.json ./
+RUN npm ci --only=production
+
+# Copy source code and build
+COPY . .
+RUN npm run build
+
+# Production stage
+FROM nginx:alpine
+
+# Copy built files
+COPY --from=build /app/dist /usr/share/nginx/html
+
+# Copy nginx configuration
+COPY nginx.conf /etc/nginx/nginx.conf
+
+EXPOSE 80 443
+
+CMD ["nginx", "-g", "daemon off;"]
+```
+
+**4. Nginx Configuration:**
+
+```nginx
+# frontend/nginx.conf
+events {
+    worker_connections 1024;
+}
+
+http {
+    include /etc/nginx/mime.types;
+    default_type application/octet-stream;
+
+    # Gzip compression
+    gzip on;
+    gzip_vary on;
+    gzip_min_length 1024;
+    gzip_types text/plain text/css application/json application/javascript text/xml application/xml;
+
+    # Rate limiting
+    limit_req_zone $binary_remote_addr zone=api:10m rate=10r/s;
+
+    upstream backend {
+        server backend:8000;
+    }
+
+    server {
+        listen 80;
+        server_name your-domain.com;
+        
+        # Redirect HTTP to HTTPS
+        return 301 https://$server_name$request_uri;
+    }
+
+    server {
+        listen 443 ssl http2;
+        server_name your-domain.com;
+
+        # SSL configuration
+        ssl_certificate /etc/nginx/ssl/cert.pem;
+        ssl_certificate_key /etc/nginx/ssl/key.pem;
+        ssl_protocols TLSv1.2 TLSv1.3;
+        ssl_ciphers ECDHE-RSA-AES256-GCM-SHA512:DHE-RSA-AES256-GCM-SHA512;
+
+        # Security headers
+        add_header X-Frame-Options DENY;
+        add_header X-Content-Type-Options nosniff;
+        add_header X-XSS-Protection "1; mode=block";
+        add_header Strict-Transport-Security "max-age=31536000; includeSubDomains";
+
+        # Frontend
+        location / {
+            root /usr/share/nginx/html;
+            try_files $uri $uri/ /index.html;
+            
+            # Cache static assets
+            location ~* \.(js|css|png|jpg|jpeg|gif|ico|svg)$ {
+                expires 1y;
+                add_header Cache-Control "public, immutable";
+            }
+        }
+
+        # API proxy
+        location /api/ {
+            limit_req zone=api burst=20 nodelay;
+            
+            proxy_pass http://backend;
+            proxy_set_header Host $host;
+            proxy_set_header X-Real-IP $remote_addr;
+            proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+            proxy_set_header X-Forwarded-Proto $scheme;
+            
+            # Timeouts
+            proxy_connect_timeout 30s;
+            proxy_send_timeout 30s;
+            proxy_read_timeout 30s;
+        }
+    }
+}
+```
+
+**5. Deploy with Docker Compose:**
+
+```bash
+# Create production environment file
+cp .env.example .env.prod
+
+# Edit .env.prod with production values:
+DB_PASSWORD=secure-database-password
+SECRET_KEY=super-secure-secret-key-for-production
+
+# Build and start services
+docker-compose -f docker-compose.prod.yml --env-file .env.prod up -d
+
+# Check logs
+docker-compose -f docker-compose.prod.yml logs -f
+```
+
+#### Option B: Traditional Server Deployment
+
+**1. Server Setup (Ubuntu 20.04+):**
+
+```bash
+# Update system
+sudo apt update && sudo apt upgrade -y
+
+# Install dependencies
+sudo apt install -y python3 python3-pip python3-venv postgresql postgresql-contrib nginx certbot python3-certbot-nginx nodejs npm git
+
+# Install PM2 for process management
+sudo npm install -g pm2
+```
+
+**2. Database Setup:**
+
+```bash
+# Configure PostgreSQL
+sudo -u postgres psql
+CREATE DATABASE schoolcopy_db;
+CREATE USER schoolcopy_user WITH PASSWORD 'secure_password';
+GRANT ALL PRIVILEGES ON DATABASE schoolcopy_db TO schoolcopy_user;
+\q
+
+# Configure PostgreSQL for remote connections (if needed)
+sudo nano /etc/postgresql/12/main/postgresql.conf
+# Set: listen_addresses = 'localhost'
+
+sudo nano /etc/postgresql/12/main/pg_hba.conf
+# Add: local   schoolcopy_db   schoolcopy_user   md5
+
+sudo systemctl restart postgresql
+```
+
+**3. Application Deployment:**
+
+```bash
+# Clone repository
+cd /opt
+sudo git clone <repository-url> schoolcopy
+sudo chown -R $USER:$USER /opt/schoolcopy
+cd /opt/schoolcopy
+
+# Backend setup
+cd backend
+python3 -m venv venv
+source venv/bin/activate
+pip install -r requirements.txt
+
+# Configure environment
+cp .env.example .env
+# Edit .env with production values
+
+# Run database migrations
+python -m alembic upgrade head
+
+# Create PM2 ecosystem file
+cat > ecosystem.config.js << EOF
+module.exports = {
+  apps: [{
+    name: 'schoolcopy-backend',
+    script: 'venv/bin/uvicorn',
+    args: 'main:app --host 0.0.0.0 --port 8000',
+    cwd: '/opt/schoolcopy/backend',
+    instances: 2,
+    exec_mode: 'cluster',
+    env: {
+      NODE_ENV: 'production'
+    }
+  }]
+};
+EOF
+
+# Start backend with PM2
+pm2 start ecosystem.config.js
+pm2 save
+pm2 startup
+```
+
+**4. Frontend Build and Deploy:**
+
+```bash
+# Build frontend
+cd /opt/schoolcopy/frontend
+npm install
+npm run build
+
+# Copy build to nginx directory
+sudo cp -r dist/* /var/www/html/
+sudo chown -R www-data:www-data /var/www/html
+```
+
+**5. Nginx Configuration:**
+
+```bash
+# Create nginx site configuration
+sudo nano /etc/nginx/sites-available/schoolcopy
+
+# Add the nginx configuration from above
+
+# Enable site
+sudo ln -s /etc/nginx/sites-available/schoolcopy /etc/nginx/sites-enabled/
+sudo rm /etc/nginx/sites-enabled/default
+
+# Test configuration
+sudo nginx -t
+
+# Restart nginx
+sudo systemctl restart nginx
+```
+
+**6. SSL Certificate:**
+
+```bash
+# Get SSL certificate with Let's Encrypt
+sudo certbot --nginx -d your-domain.com
+
+# Auto-renewal
+sudo crontab -e
+# Add: 0 12 * * * /usr/bin/certbot renew --quiet
+```
+
+### 3.4 Environment Variables
+
+**Backend (.env):**
+```bash
+# Database
+DATABASE_URL=postgresql://user:password@localhost:5432/schoolcopy_db
+
+# Security
+SECRET_KEY=your-super-secret-key-minimum-32-characters
+ALGORITHM=HS256
+ACCESS_TOKEN_EXPIRE_MINUTES=30
+
+# Company Information
+COMPANY_NAME=School Copy Manufacturing
+COMPANY_ADDRESS=123 Business Street, Karachi, Pakistan
+COMPANY_PHONE=+92 300 1234567
+COMPANY_EMAIL=info@schoolcopy.com
+
+# File Storage
+INVOICE_DIR=./invoices
+UPLOAD_DIR=./uploads
+
+# CORS (for production)
+ALLOWED_ORIGINS=https://your-domain.com,https://www.your-domain.com
+
+# Logging
+LOG_LEVEL=INFO
+LOG_FILE=./logs/app.log
+```
+
+**Frontend (.env.local):**
+```bash
+# API Configuration
+VITE_API_BASE_URL=https://your-domain.com/api/v1
+
+# App Configuration
+VITE_APP_NAME=School Copy Management
+VITE_APP_VERSION=1.0.0
+
+# Features
+VITE_ENABLE_ANALYTICS=false
+VITE_ENABLE_DEBUG=false
+```
+
+### 3.5 Monitoring and Maintenance
+
+**Health Check Endpoints:**
+```bash
+# Backend health
+curl https://your-domain.com/api/v1/health
+
+# Database connectivity
+curl https://your-domain.com/api/v1/health/db
+```
+
+**Log Monitoring:**
+```bash
+# PM2 logs
+pm2 logs schoolcopy-backend
+
+# Nginx logs
+sudo tail -f /var/log/nginx/access.log
+sudo tail -f /var/log/nginx/error.log
+
+# Application logs
+tail -f /opt/schoolcopy/backend/logs/app.log
+```
+
+**Backup Strategy:**
+```bash
+# Database backup script
+#!/bin/bash
+BACKUP_DIR="/opt/backups"
+DATE=$(date +%Y%m%d_%H%M%S)
+DB_NAME="schoolcopy_db"
+
+# Create backup
+pg_dump -U schoolcopy_user -h localhost $DB_NAME > $BACKUP_DIR/db_backup_$DATE.sql
+
+# Compress backup
+gzip $BACKUP_DIR/db_backup_$DATE.sql
+
+# Remove backups older than 30 days
+find $BACKUP_DIR -name "db_backup_*.sql.gz" -mtime +30 -delete
+
+# Add to crontab for daily backups:
+# 0 2 * * * /opt/scripts/backup.sh
+```
+
+**Performance Monitoring:**
+```bash
+# System resources
+htop
+df -h
+free -h
+
+# Application performance
+pm2 monit
+
+# Database performance
+sudo -u postgres psql -c "SELECT * FROM pg_stat_activity;"
+```
+
+### 3.6 Security Checklist
+
+**Server Security:**
+- [ ] Firewall configured (UFW/iptables)
+- [ ] SSH key-based authentication
+- [ ] Regular security updates
+- [ ] Non-root user for applications
+- [ ] Fail2ban for intrusion prevention
+
+**Application Security:**
+- [ ] Strong SECRET_KEY (32+ characters)
+- [ ] HTTPS enabled with valid SSL certificate
+- [ ] CORS properly configured
+- [ ] Rate limiting enabled
+- [ ] Input validation and sanitization
+- [ ] SQL injection prevention (using ORM)
+- [ ] XSS protection headers
+
+**Database Security:**
+- [ ] Strong database passwords
+- [ ] Limited database user privileges
+- [ ] Regular database backups
+- [ ] Connection encryption (SSL)
+
+### 3.7 Troubleshooting
+
+**Common Issues:**
+
+1. **Backend won't start:**
+   ```bash
+   # Check logs
+   pm2 logs schoolcopy-backend
+   
+   # Check database connection
+   python -c "from database import engine; print('DB OK')"
+   ```
+
+2. **Frontend build fails:**
+   ```bash
+   # Clear cache and reinstall
+   rm -rf node_modules package-lock.json
+   npm install
+   npm run build
+   ```
+
+3. **Database connection issues:**
+   ```bash
+   # Test connection
+   psql -U schoolcopy_user -h localhost -d schoolcopy_db
+   
+   # Check PostgreSQL status
+   sudo systemctl status postgresql
+   ```
+
+4. **SSL certificate issues:**
+   ```bash
+   # Renew certificate
+   sudo certbot renew
+   
+   # Check certificate status
+   sudo certbot certificates
+   ```
+
+**Performance Issues:**
+
+1. **Slow API responses:**
+   - Check database query performance
+   - Monitor server resources
+   - Enable database query logging
+   - Consider adding database indexes
+
+2. **High memory usage:**
+   - Monitor PM2 processes
+   - Check for memory leaks
+   - Adjust PM2 instance count
+
+3. **Database performance:**
+   - Analyze slow queries
+   - Update table statistics
+   - Consider connection pooling
+
+---
+
+## 4. Maintenance and Updates
+
+### 4.1 Regular Maintenance Tasks
+
+**Daily:**
+- Monitor application logs
+- Check system resources
+- Verify backup completion
+
+**Weekly:**
+- Review security logs
+- Update system packages
+- Check SSL certificate expiry
+
+**Monthly:**
+- Database maintenance (VACUUM, ANALYZE)
+- Review and rotate logs
+- Security audit
+- Performance review
+
+### 4.2 Update Procedures
+
+**Application Updates:**
+```bash
+# Backup current version
+cp -r /opt/schoolcopy /opt/schoolcopy.backup
+
+# Pull latest changes
+cd /opt/schoolcopy
+git pull origin main
+
+# Update backend
+cd backend
+source venv/bin/activate
+pip install -r requirements.txt
+python -m alembic upgrade head
+
+# Update frontend
+cd ../frontend
+npm install
+npm run build
+sudo cp -r dist/* /var/www/html/
+
+# Restart services
+pm2 restart schoolcopy-backend
+sudo systemctl reload nginx
+```
+
+**Database Migrations:**
+```bash
+# Create migration
+cd /opt/schoolcopy/backend
+source venv/bin/activate
+alembic revision --autogenerate -m "Description of changes"
+
+# Apply migration
+alembic upgrade head
+```
+
+This completes the comprehensive deployment guide for the School Copy Management System. The system is now ready for production deployment with proper security, monitoring, and maintenance procedures.NumberFormat('en-PK', {
+      style: 'currency',
+      currency: 'PKR',
+      minimumFractionDigits: 0,
       maximumFractionDigits: 2,
     }).format(amount);
   };
