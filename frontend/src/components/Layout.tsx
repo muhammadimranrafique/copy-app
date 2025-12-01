@@ -1,5 +1,5 @@
 import { Link, useLocation } from 'react-router-dom';
-import { LayoutDashboard, Users, Package, ShoppingCart, DollarSign, Receipt, Settings, LogOut, Menu, X } from 'lucide-react';
+import { LayoutDashboard, Users, Package, ShoppingCart, DollarSign, Receipt, Settings, LogOut, Menu, X, BookOpen } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { useAuth } from '@/lib/useAuth';
 import { Button } from '@/components/ui/button';
@@ -14,6 +14,7 @@ const navItems = [
   { path: '/orders', label: 'Orders', icon: ShoppingCart },
   { path: '/payments', label: 'Payments', icon: DollarSign },
   { path: '/expenses', label: 'Expenses', icon: Receipt },
+  { path: '/ledger', label: 'Ledger', icon: BookOpen },
   { path: '/settings', label: 'Settings', icon: Settings },
 ];
 
@@ -140,7 +141,7 @@ export default function Layout({ children }: { children: React.ReactNode }) {
             );
           })}
         </nav>
-        
+
         {/* User Profile Section */}
         <div className="p-4 border-t">
           <div className="flex items-center gap-3 p-3 rounded-lg bg-accent/50">
@@ -154,8 +155,8 @@ export default function Layout({ children }: { children: React.ReactNode }) {
               <p className="text-xs text-muted-foreground truncate">{user?.email}</p>
             </div>
           </div>
-          <Button 
-            variant="ghost" 
+          <Button
+            variant="ghost"
             className="w-full mt-2 justify-start text-muted-foreground hover:text-foreground"
             onClick={handleLogout}
           >

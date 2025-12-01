@@ -82,7 +82,7 @@ class ApiClient {
     // Try to parse response
     let data: any;
     const text = await response.text();
-    
+
     try {
       data = text ? JSON.parse(text) : null;
       if (isDebug) {
@@ -207,6 +207,14 @@ class ApiClient {
       body: JSON.stringify(data),
     });
     return { success: true, data: response };
+  }
+
+  async getLeaderLedger(leaderId: string): Promise<any[]> {
+    return await this.fetchJson<any[]>(`/leaders/${leaderId}/ledger`);
+  }
+
+  async getOrdersByLeader(leaderId: string): Promise<any[]> {
+    return await this.fetchJson<any[]>(`/orders/school/${leaderId}`);
   }
 
   async getDashboardData(params?: QueryParams): Promise<DashboardData> {

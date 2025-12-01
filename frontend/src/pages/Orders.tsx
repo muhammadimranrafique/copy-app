@@ -40,7 +40,10 @@ export default function Orders() {
     leaderId: '',
     orderDate: new Date().toISOString().split('T')[0],
     totalAmount: 0,
-    status: 'Pending'
+    status: 'Pending',
+    initialPayment: 0,
+    paymentMode: 'Cash',
+    paymentDate: new Date().toISOString().split('T')[0]
   });
 
   const {
@@ -76,12 +79,12 @@ export default function Orders() {
       toast.error('Please enter an order number');
       return;
     }
-    
+
     if (!formData.leaderId) {
       toast.error('Please select a leader');
       return;
     }
-    
+
     if (formData.totalAmount <= 0) {
       toast.error('Total amount must be greater than 0');
       return;
@@ -95,7 +98,10 @@ export default function Orders() {
         leaderId: '',
         orderDate: new Date().toISOString().split('T')[0],
         totalAmount: 0,
-        status: 'Pending'
+        status: 'Pending',
+        initialPayment: 0,
+        paymentMode: 'Cash',
+        paymentDate: new Date().toISOString().split('T')[0]
       });
       loadOrders();
     } catch (error: any) {
@@ -191,6 +197,51 @@ export default function Orders() {
                     <SelectItem value="Paid">Paid</SelectItem>
                   </SelectContent>
                 </Select>
+              </div>
+
+              <div className="border-t pt-4 mt-4">
+                <h4 className="font-medium mb-3">Initial Payment (Optional)</h4>
+                <div className="space-y-4">
+                  <div>
+                    <Label htmlFor="initialPayment">Amount Received</Label>
+                    <Input
+                      id="initialPayment"
+                      type="number"
+                      step="0.01"
+                      value={formData.initialPayment}
+                      onChange={(e) => setFormData({ ...formData, initialPayment: parseFloat(e.target.value) || 0 })}
+                      placeholder="0.00"
+                    />
+                  </div>
+
+                  {formData.initialPayment > 0 && (
+                    <>
+                      <div>
+                        <Label htmlFor="paymentMode">Payment Mode</Label>
+                        <Select value={formData.paymentMode} onValueChange={(value) => setFormData({ ...formData, paymentMode: value })}>
+                          <SelectTrigger>
+                            <SelectValue />
+                          </SelectTrigger>
+                          <SelectContent>
+                            <SelectItem value="Cash">Cash</SelectItem>
+                            <SelectItem value="Bank Transfer">Bank Transfer</SelectItem>
+                            <SelectItem value="Cheque">Cheque</SelectItem>
+                            <SelectItem value="UPI">UPI</SelectItem>
+                          </SelectContent>
+                        </Select>
+                      </div>
+                      <div>
+                        <Label htmlFor="paymentDate">Payment Date</Label>
+                        <Input
+                          id="paymentDate"
+                          type="date"
+                          value={formData.paymentDate}
+                          onChange={(e) => setFormData({ ...formData, paymentDate: e.target.value })}
+                        />
+                      </div>
+                    </>
+                  )}
+                </div>
               </div>
               <Button type="submit" className="w-full">Create Order</Button>
             </form>

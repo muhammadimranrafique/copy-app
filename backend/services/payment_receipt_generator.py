@@ -1,370 +1,420 @@
 from reportlab.lib import colors
 from reportlab.lib.pagesizes import A4
-from reportlab.platypus import SimpleDocTemplate, Table, TableStyle, Paragraph, Spacer, Image, KeepTogether
+from reportlab.platypus import SimpleDocTemplate, Table, TableStyle, Paragraph, Spacer, Image
 from reportlab.lib.styles import getSampleStyleSheet, ParagraphStyle
-from reportlab.lib.units import inch, mm
-from reportlab.lib.enums import TA_CENTER, TA_LEFT, TA_RIGHT, TA_JUSTIFY
-from reportlab.pdfgen import canvas
+from reportlab.lib.units import mm
+from reportlab.lib.enums import TA_CENTER, TA_LEFT, TA_RIGHT
 import qrcode
 import io
 from datetime import datetime
-from typing import Dict, Any, Optional
+from typing import Dict, Any, Optional, List
 from config import get_settings
 import os
 
 settings = get_settings()
 
-
-
-
-class ProfessionalInvoiceGenerator:
-    """Professional A4 single-page invoice generator with eye-catching design."""
+class PaymentReceiptGenerator:
+    """Professional A4 single-page payment receipt generator."""
     
     def __init__(self):
-        self.invoice_dir = settings.invoice_dir
-        os.makedirs(self.invoice_dir, exist_ok=True)
+        # Use a receipts directory sibling to invoices
+        self.receipt_dir = os.path.join(os.path.dirname(settings.invoice_dir), "receipts")
+        os.makedirs(self.receipt_dir, exist_ok=True)
+
+        # Professional Color Palette
+        self.primary_dark = colors.HexColor('#1e40af')      # Dark blue
+        self.primary = colors.HexColor('#3b82f6')           # Blue
+        self.primary_light = colors.HexColor('#60a5fa')     # Light blue
+        self.success = colors.HexColor('#10b981')           # Green
+        self.warning = colors.HexColor('#f59e0b')           # Yellow/Gold
+        self.danger = colors.HexColor('#ef4444')            # Red
+        self.orange = colors.HexColor('#ea580c')            # Orange
+        self.bg_light = colors.HexColor('#f8fafc')          # Light gray
+        self.bg_blue = colors.HexColor('#eff6ff')           # Light blue bg
+        self.bg_green = colors.HexColor('#dcfce7')          # Light green bg
+        self.bg_red = colors.HexColor('#fef2f2')            # Light red bg
+        self.bg_orange = colors.HexColor('#fff7ed')         # Light orange bg
+        self.text_dark = colors.HexColor('#1e293b')         # Dark text
+        self.text_medium = colors.HexColor('#475569')       # Medium text
+        self.text_light = colors.HexColor('#64748b')        # Light text
+        self.border = colors.HexColor('#cbd5e1')            # Border gray
+
+    def _create_header(self, story, styles, receipt_number: str, company_settings: Optional[Dict[str, Any]] = None):
+        """Create professional header with Company Name and Receipt Badge."""
+        company_name = (company_settings or {}).get('company_name', settings.company_name)
         
-        # Premium color palette
-        self.primary_dark = colors.HexColor('#1e40af')
-        self.primary = colors.HexColor('#3b82f6')
-        self.primary_light = colors.HexColor('#60a5fa')
-        self.success = colors.HexColor('#10b981')
-        self.success_light = colors.HexColor('#34d399')
-        self.warning = colors.HexColor('#f59e0b')
-        self.accent = colors.HexColor('#8b5cf6')
-        self.bg_light = colors.HexColor('#f8fafc')
-        self.bg_blue = colors.HexColor('#eff6ff')
-        self.text_dark = colors.HexColor('#1e293b')
-        self.text_medium = colors.HexColor('#475569')
-        self.text_light = colors.HexColor('#64748b')
-        self.border = colors.HexColor('#cbd5e1')
-    
-    def _create_premium_header(self, story, styles, receipt_number: str, payment_data: Dict[str, Any], company_settings: Optional[Dict[str, Any]] = None):
-        """Create professional header with full width utilization."""
-        company_name = company_settings.get('company_name', settings.company_name) if company_settings else settings.company_name
-        
-        header_content = [
-            [
-                Paragraph(
-                    f'<b><font size=24 color=#1e40af>{company_name}</font></b><br/>'
-                    f'<font size=10 color=#64748b>Professional Manufacturing Solutions</font>',
-                    ParagraphStyle('CompanyInfo', parent=styles['Normal'], leading=18)
-                ),
-                Paragraph(
-                    f'<b><font size=14 color=white>PAYMENT RECEIPT</font></b><br/>'
-                    f'<font size=16 color=white><b>#{receipt_number}</b></font>',
-                    ParagraphStyle('ReceiptBadge', parent=styles['Normal'], alignment=TA_CENTER, leading=18)
-                )
-            ]
+        # Left: Company Info
+        company_info = Paragraph(
+            f'<b><font size=18 color={self.primary_dark}>{company_name}</font></b><br/>'
+            f'<font size=9 color={self.text_light}>Professional Manufacturing Solutions</font>',
+            ParagraphStyle('CompanyInfo', parent=styles['Normal'], leading=12)
+        )
+
+        # Right: Receipt Badge
+        receipt_badge_content = [
+            [Paragraph(
+                f'<b><font size=11 color=white>PAYMENT RECEIPT</font></b><br/>'
+                f'<font size=12 color=white><b>#{receipt_number}</b></font>',
+                ParagraphStyle('ReceiptBadgeText', parent=styles['Normal'], alignment=TA_CENTER, leading=14)
+            )]
         ]
-        
-        header_table = Table(header_content, colWidths=[120*mm, 75*mm])
+        receipt_badge = Table(receipt_badge_content, colWidths=[60*mm])
+        receipt_badge.setStyle(TableStyle([
+            ('BACKGROUND', (0, 0), (-1, -1), self.primary),
+            ('ALIGN', (0, 0), (-1, -1), 'CENTER'),
+            ('VALIGN', (0, 0), (-1, -1), 'MIDDLE'),
+            ('TOPPADDING', (0, 0), (-1, -1), 10),
+            ('BOTTOMPADDING', (0, 0), (-1, -1), 10),
+            ('ROUNDEDCORNERS', [8, 8, 8, 8]),
+        ]))
+
+        # Header Layout Table
+        header_data = [[company_info, receipt_badge]]
+        header_table = Table(header_data, colWidths=[130*mm, 60*mm])
         header_table.setStyle(TableStyle([
             ('ALIGN', (0, 0), (0, 0), 'LEFT'),
-            ('ALIGN', (1, 0), (1, 0), 'CENTER'),
-            ('VALIGN', (0, 0), (-1, -1), 'MIDDLE'),
-            ('BACKGROUND', (1, 0), (1, 0), self.primary),
-            ('TOPPADDING', (1, 0), (1, 0), 12),
-            ('BOTTOMPADDING', (1, 0), (1, 0), 12),
-            ('LEFTPADDING', (1, 0), (1, 0), 15),
-            ('RIGHTPADDING', (1, 0), (1, 0), 15),
-            ('ROUNDEDCORNERS', [10, 10, 10, 10]),
-            ('BOX', (1, 0), (1, 0), 3, self.primary_dark),
+            ('ALIGN', (1, 0), (1, 0), 'RIGHT'),
+            ('VALIGN', (0, 0), (-1, -1), 'TOP'),
         ]))
         
         story.append(header_table)
         story.append(Spacer(1, 5*mm))
-    
-    def _create_info_section(self, story, styles, payment_data: Dict[str, Any], client_data: Dict[str, Any]):
-        """Create comprehensive information section with modern layout."""
+
+    def _create_receipt_details(self, story, styles, order_data: Dict[str, Any], client_data: Dict[str, Any], payment_data: Dict[str, Any]):
+        """Create receipt details section."""
         
-        payment_date = payment_data.get('payment_date', datetime.now())
-        status = payment_data.get('status', 'COMPLETED')
-        
-        if isinstance(payment_date, str):
-            try:
-                payment_date = datetime.fromisoformat(payment_date.replace('Z', '+00:00'))
-            except:
-                payment_date = datetime.now()
-        
+        # Format dates
+        payment_date_str = payment_data.get('payment_date', datetime.now().isoformat())
+        try:
+            payment_date = datetime.fromisoformat(payment_date_str.replace('Z', '+00:00'))
+        except:
+            payment_date = datetime.now()
         formatted_date = payment_date.strftime('%d %B %Y')
-        formatted_time = payment_date.strftime('%I:%M %p')
+
+        # --- Left Card: RECEIVED FROM ---
+        received_from_header = Paragraph(
+            '<b><font size=10 color=#1e40af>RECEIVED FROM</font></b>',
+            ParagraphStyle('CardHeader', parent=styles['Normal'], spaceAfter=0)
+        )
         
-        # Status styling
-        status_colors = {
-            'COMPLETED': self.success,
-            'PENDING': self.warning,
-            'PARTIAL': self.primary,
-        }
-        status_color = status_colors.get(status, colors.grey)
-        
-        # Create two-column layout
-        left_section = [
-            [Paragraph('<b><font size=11 color=#1e40af>RECEIVED FROM</font></b>', 
-                      ParagraphStyle('SH', parent=styles['Normal'], spaceAfter=3))],
-            [Paragraph(f'<b><font size=12>{client_data.get("name", "N/A")}</font></b>', styles['Normal'])],
-            [Paragraph(f'<font size=9 color=#64748b><b>Type:</b> {client_data.get("type", "N/A")}</font>', styles['Normal'])],
-            [Paragraph(f'<font size=9 color=#64748b><b>Contact:</b> {client_data.get("contact", "N/A")}</font>', styles['Normal'])],
-            [Paragraph(f'<font size=9 color=#64748b><b>Address:</b> {client_data.get("address", "N/A")}</font>', styles['Normal'])],
+        received_from_content = [
+            [received_from_header],
+            [Paragraph(f'<b><font size=11>{client_data.get("name", "N/A")}</font></b>', styles['Normal'])],
+            [Paragraph(f'<font size=8 color=#64748b>Contact: {client_data.get("contact", "N/A")}</font>', styles['Normal'])],
         ]
         
-        left_table = Table(left_section, colWidths=[90*mm])
-        left_table.setStyle(TableStyle([
-            ('BACKGROUND', (0, 0), (-1, 0), self.bg_blue),
-            ('TOPPADDING', (0, 0), (-1, 0), 8),
-            ('BOTTOMPADDING', (0, 0), (-1, 0), 8),
-            ('LEFTPADDING', (0, 0), (-1, -1), 12),
-            ('TOPPADDING', (0, 1), (-1, -1), 5),
-            ('BOTTOMPADDING', (0, 1), (-1, -1), 5),
-            ('BOX', (0, 0), (-1, -1), 1.5, self.border),
-            ('LINEBELOW', (0, 0), (-1, 0), 2, self.primary),
-            ('ROUNDEDCORNERS', [8, 8, 8, 8]),
+        received_from_table = Table(received_from_content, colWidths=[90*mm])
+        received_from_table.setStyle(TableStyle([
+            ('BACKGROUND', (0, 0), (0, 0), self.bg_blue),
+            ('TOPPADDING', (0, 0), (0, 0), 6),
+            ('BOTTOMPADDING', (0, 0), (0, 0), 6),
+            ('LEFTPADDING', (0, 0), (0, 0), 8),
+            ('LINEBELOW', (0, 0), (0, 0), 1, self.primary_light),
+            ('TOPPADDING', (0, 1), (-1, -1), 4),
+            ('BOTTOMPADDING', (0, 1), (-1, -1), 4),
+            ('LEFTPADDING', (0, 1), (-1, -1), 8),
+            ('BOTTOMPADDING', (0, -1), (-1, -1), 6),
+            ('BOX', (0, 0), (-1, -1), 1, self.border),
+            ('ROUNDEDCORNERS', [6, 6, 6, 6]),
         ]))
+
+        # --- Right Card: RECEIPT DETAILS ---
+        details_header = Paragraph(
+            '<b><font size=10 color=#1e40af>RECEIPT DETAILS</font></b>',
+            ParagraphStyle('CardHeader', parent=styles['Normal'], spaceAfter=0)
+        )
         
-        right_section = [
-            [Paragraph('<b><font size=11 color=#1e40af>PAYMENT DETAILS</font></b>', 
-                      ParagraphStyle('SH', parent=styles['Normal'], spaceAfter=3))],
+        details_content = [
+            [details_header],
             [Paragraph(f'<b>Date:</b> {formatted_date}', styles['Normal'])],
-            [Paragraph(f'<b>Time:</b> {formatted_time}', styles['Normal'])],
-            [Paragraph(f'<b>Method:</b> {payment_data.get("method", "N/A")}', styles['Normal'])],
-            [Paragraph(f'<b>Status:</b> <font color={status_color.hexval()}><b>{status}</b></font>', styles['Normal'])],
+            [Paragraph(f'<b>Payment Mode:</b> {payment_data.get("mode", "N/A")}', styles['Normal'])],
+            [Paragraph(f'<b>Reference:</b> {payment_data.get("reference_number", "N/A")}', styles['Normal'])],
         ]
         
-        if payment_data.get('reference_number'):
-            right_section.append([Paragraph(
-                f'<font size=8 color=#64748b><b>Ref:</b> {payment_data.get("reference_number")}</font>', 
-                styles['Normal']
-            )])
-        
-        right_table = Table(right_section, colWidths=[95*mm])
-        right_table.setStyle(TableStyle([
-            ('BACKGROUND', (0, 0), (-1, 0), self.bg_blue),
-            ('TOPPADDING', (0, 0), (-1, 0), 8),
-            ('BOTTOMPADDING', (0, 0), (-1, 0), 8),
-            ('LEFTPADDING', (0, 0), (-1, -1), 12),
-            ('TOPPADDING', (0, 1), (-1, -1), 5),
-            ('BOTTOMPADDING', (0, 1), (-1, -1), 5),
-            ('FONTSIZE', (0, 1), (-1, -1), 9),
-            ('BOX', (0, 0), (-1, -1), 1.5, self.border),
-            ('LINEBELOW', (0, 0), (-1, 0), 2, self.primary),
-            ('ROUNDEDCORNERS', [8, 8, 8, 8]),
+        details_table = Table(details_content, colWidths=[90*mm])
+        details_table.setStyle(TableStyle([
+            ('BACKGROUND', (0, 0), (0, 0), self.bg_blue),
+            ('TOPPADDING', (0, 0), (0, 0), 6),
+            ('BOTTOMPADDING', (0, 0), (0, 0), 6),
+            ('LEFTPADDING', (0, 0), (0, 0), 8),
+            ('LINEBELOW', (0, 0), (0, 0), 1, self.primary_light),
+            ('TOPPADDING', (0, 1), (-1, -1), 4),
+            ('BOTTOMPADDING', (0, 1), (-1, -1), 4),
+            ('LEFTPADDING', (0, 1), (-1, -1), 8),
+            ('BOTTOMPADDING', (0, -1), (-1, -1), 6),
+            ('BOX', (0, 0), (-1, -1), 1, self.border),
+            ('ROUNDEDCORNERS', [6, 6, 6, 6]),
         ]))
-        
-        # Combine both sections with full width utilization
-        combined_data = [[left_table, right_table]]
-        combined_table = Table(combined_data, colWidths=[95*mm, 100*mm], hAlign='LEFT')
-        combined_table.setStyle(TableStyle([
+
+        # Layout for Cards
+        cards_layout = Table([[received_from_table, details_table]], colWidths=[95*mm, 95*mm])
+        cards_layout.setStyle(TableStyle([
             ('VALIGN', (0, 0), (-1, -1), 'TOP'),
-            ('LEFTPADDING', (0, 0), (-1, -1), 0),
-            ('RIGHTPADDING', (0, 0), (-1, -1), 0),
+            ('ALIGN', (0, 0), (0, 0), 'LEFT'),
+            ('ALIGN', (1, 0), (1, 0), 'RIGHT'),
         ]))
         
-        story.append(combined_table)
-        story.append(Spacer(1, 6*mm))
-    
+        story.append(cards_layout)
+        story.append(Spacer(1, 4*mm))
+
     def _create_amount_spotlight(self, story, styles, payment_data: Dict[str, Any], company_settings: Optional[Dict[str, Any]] = None):
-        """Create prominent amount display with professional styling."""
-        amount = payment_data.get('amount', 0)
+        """Create a prominent spotlight section for the received amount."""
         currency_symbol = (company_settings or {}).get('currency_symbol', 'Rs')
+        amount = float(payment_data.get('amount', 0))
         
-        amount_content = [
-            [Paragraph('<font size=14 color=#1e40af><b>TOTAL AMOUNT RECEIVED</b></font>', 
-                      ParagraphStyle('AL', parent=styles['Normal'], alignment=TA_CENTER))],
-            [Paragraph(f'<b><font size=48 color=#10b981>{currency_symbol} {amount:,.2f}</font></b>', 
-                      ParagraphStyle('AV', parent=styles['Normal'], alignment=TA_CENTER))],
-            [Paragraph('<font size=10 color=#64748b>Payment Successfully Processed & Confirmed</font>', 
-                      ParagraphStyle('AS', parent=styles['Normal'], alignment=TA_CENTER))],
+        # Define custom green colors for this section
+        green_bg = '#dcfce7'      # Light green background
+        green_text = '#10b981'    # Bright green text
+        green_border = '#10b981'  # Green border
+        
+        content = [
+            [Paragraph('CURRENT PAYMENT RECEIVED', ParagraphStyle('SpotlightLabel', parent=styles['Normal'], alignment=TA_CENTER, fontSize=14, textColor='#374151', spaceAfter=6))],
+            [Paragraph(f'<b><font size=48 color={green_text}>{currency_symbol} {amount:,.2f}</font></b>', ParagraphStyle('SpotlightAmount', parent=styles['Normal'], alignment=TA_CENTER, leading=56))],
+            [Paragraph(f'<font color={green_text} size=10>✓ Payment Successfully Processed</font>', ParagraphStyle('SpotlightMsg', parent=styles['Normal'], alignment=TA_CENTER, spaceBefore=4))],
         ]
         
-        amount_table = Table(amount_content, colWidths=[195*mm])
-        amount_table.setStyle(TableStyle([
-            ('BACKGROUND', (0, 0), (-1, -1), colors.HexColor('#f0fdf4')),
+        spotlight_table = Table(content, colWidths=[190*mm])
+        spotlight_table.setStyle(TableStyle([
+            ('BACKGROUND', (0, 0), (-1, -1), green_bg),
             ('ALIGN', (0, 0), (-1, -1), 'CENTER'),
             ('VALIGN', (0, 0), (-1, -1), 'MIDDLE'),
-            ('TOPPADDING', (0, 0), (0, 0), 15),
-            ('BOTTOMPADDING', (0, 0), (0, 0), 8),
-            ('TOPPADDING', (0, 1), (0, 1), 8),
-            ('BOTTOMPADDING', (0, 1), (0, 1), 8),
-            ('TOPPADDING', (0, 2), (0, 2), 5),
-            ('BOTTOMPADDING', (0, 2), (0, 2), 15),
-            ('BOX', (0, 0), (-1, -1), 3, self.success),
-            ('ROUNDEDCORNERS', [12, 12, 12, 12]),
+            ('TOPPADDING', (0, 0), (-1, -1), 20),
+            ('BOTTOMPADDING', (0, 0), (-1, -1), 20),
+            ('BOX', (0, 0), (-1, -1), 3, green_border), # Thick green border
+            ('ROUNDEDCORNERS', [12, 12, 12, 12]),       # More rounded corners
         ]))
         
-        story.append(amount_table)
-        story.append(Spacer(1, 6*mm))
-    
-    def _create_qr_and_thankyou(self, story, styles, payment_data: Dict[str, Any]):
-        """Create QR code with elegant thank you message."""
-        try:
-            # Generate QR code
-            receipt_number = payment_data.get('receipt_number', '')
-            amount = payment_data.get('amount', 0)
-            payment_id = payment_data.get('payment_id', '')
+        story.append(spotlight_table)
+        story.append(Spacer(1, 8*mm))
 
-            qr_data = f"RECEIPT:{receipt_number}|ID:{payment_id}|AMT:Rs.{amount:,.2f}|VERIFY:https://verify.receipt/{payment_id}"
-            qr = qrcode.QRCode(version=1, box_size=4, border=2)
+    def _create_payment_summary(self, story, styles, order_data: Dict[str, Any], payment_history: List[Dict[str, Any]], company_settings: Optional[Dict[str, Any]] = None):
+        """Create comprehensive payment summary table."""
+        currency_symbol = (company_settings or {}).get('currency_symbol', 'Rs')
+        
+        # Extract values BEFORE null check (CRITICAL FIX)
+        # If order_data is None or empty, these will be 0
+        total_amount = float((order_data or {}).get('total_amount', 0))
+        
+        # Handle None payment_history safely
+        safe_history = payment_history or []
+        total_paid = sum(float(p.get('amount', 0)) for p in safe_history)
+        
+        # Defensive check: Handle None order_data
+        # This block is now redundant for total_amount calculation, but kept for potential future uses of order_data
+        if order_data is None:
+            order_data = {}
+        
+        balance_due = total_amount - total_paid
+        
+        # Ensure balance isn't negative due to float precision
+        if balance_due < 0: balance_due = 0
+
+        # Section Header
+        story.append(Paragraph(
+            f'<b><font color={self.primary_dark}>💳 PAYMENT BREAKDOWN</font></b>',
+            ParagraphStyle('SummaryHeader', parent=styles['Normal'], fontSize=10, spaceAfter=4)
+        ))
+        story.append(Spacer(1, 2*mm))
+
+        # Headers
+        headers = [
+            Paragraph('<b>Total Order Amount</b>', ParagraphStyle('H1', parent=styles['Normal'], alignment=TA_CENTER, fontSize=8, textColor=self.text_medium)),
+            Paragraph('<b>Total Paid to Date</b>', ParagraphStyle('H2', parent=styles['Normal'], alignment=TA_CENTER, fontSize=8, textColor=self.text_medium)),
+            Paragraph('<b>Remaining Balance</b>', ParagraphStyle('H3', parent=styles['Normal'], alignment=TA_CENTER, fontSize=8, textColor=self.text_medium)),
+        ]
+        
+        # Values
+        values = [
+            Paragraph(f'<b><font size=13 color={self.danger}>{currency_symbol} {total_amount:,.2f}</font></b>', 
+                     ParagraphStyle('V1', parent=styles['Normal'], alignment=TA_CENTER)),
+            Paragraph(f'<b><font size=13 color={self.primary}>{currency_symbol} {total_paid:,.2f}</font></b>', 
+                     ParagraphStyle('V2', parent=styles['Normal'], alignment=TA_CENTER)),
+            Paragraph(f'<b><font size=13 color={self.orange}>{currency_symbol} {balance_due:,.2f}</font></b>', 
+                     ParagraphStyle('V3', parent=styles['Normal'], alignment=TA_CENTER)),
+        ]
+
+        summary_data = [headers, values]
+        summary_table = Table(summary_data, colWidths=[63*mm, 63*mm, 64*mm])
+        summary_table.setStyle(TableStyle([
+            ('ALIGN', (0, 0), (-1, -1), 'CENTER'),
+            ('VALIGN', (0, 0), (-1, -1), 'MIDDLE'),
+            ('GRID', (0, 0), (-1, -1), 1, self.primary),
+            ('BOX', (0, 0), (-1, -1), 1.5, self.primary),
+            # Header Row
+            ('BACKGROUND', (0, 0), (-1, 0), self.bg_blue),
+            ('TOPPADDING', (0, 0), (-1, 0), 8),
+            ('BOTTOMPADDING', (0, 0), (-1, 0), 8),
+            # Value Row
+            ('BACKGROUND', (0, 1), (0, 1), self.bg_red),      # Red bg for Total
+            ('BACKGROUND', (1, 1), (1, 1), self.bg_blue),     # Blue bg for Paid
+            ('BACKGROUND', (2, 1), (2, 1), self.bg_orange),   # Orange bg for Balance
+            ('TOPPADDING', (0, 1), (-1, 1), 10),
+            ('BOTTOMPADDING', (0, 1), (-1, 1), 10),
+        ]))
+
+        story.append(summary_table)
+        story.append(Spacer(1, 5*mm))
+
+    def _create_payment_history(self, story, styles, payment_history: List[Dict[str, Any]], current_payment_id: int, company_settings: Optional[Dict[str, Any]] = None):
+        """Create payment history table showing previous payments."""
+        currency_symbol = (company_settings or {}).get('currency_symbol', 'Rs')
+        
+        # Handle None payment_history safely
+        safe_history = payment_history or []
+        
+        # Filter out current payment and sort chronologically
+        previous_payments = [p for p in safe_history if p.get('id') != current_payment_id]
+        previous_payments.sort(key=lambda x: x.get('payment_date', ''))
+        
+        # Limit to most recent 8 payments
+        MAX_DISPLAY_ROWS = 8
+        display_note = ""
+        if len(previous_payments) > MAX_DISPLAY_ROWS:
+            previous_payments = previous_payments[-MAX_DISPLAY_ROWS:]
+            display_note = f"(Showing {MAX_DISPLAY_ROWS} most recent payments out of {len(payment_history) - 1} total)"
+        
+        # Section Header
+        header_text = '<b>📋 PREVIOUS PAYMENTS</b>'
+        if display_note:
+            header_text += f'<br/><font size=7 color=#64748b>{display_note}</font>'
+        
+        story.append(Paragraph(header_text, ParagraphStyle('HistoryHeader', parent=styles['Normal'], fontSize=10, spaceAfter=4, leading=12)))
+        story.append(Spacer(1, 2*mm))
+
+        # If no previous payments
+        if not previous_payments:
+            msg = Paragraph(
+                "✓ This is the first payment for this order",
+                ParagraphStyle('NoHistory', parent=styles['Normal'], alignment=TA_CENTER, textColor=self.text_light, fontSize=9)
+            )
+            story.append(msg)
+            story.append(Spacer(1, 4*mm))
+            return
+
+        # Table Headers
+        table_data = [['Date', 'Reference', 'Mode', 'Amount']]
+        
+        for p in previous_payments:
+            p_date_str = p.get('payment_date', '')
+            try:
+                p_date = datetime.fromisoformat(p_date_str.replace('Z', '+00:00'))
+                formatted_p_date = p_date.strftime('%d-%b-%Y')
+            except:
+                formatted_p_date = p_date_str[:10]
+                
+            table_data.append([
+                formatted_p_date,
+                p.get('reference_number', '-'),
+                p.get('mode', '-'),
+                f"{currency_symbol} {float(p.get('amount', 0)):,.2f}"
+            ])
+            
+        history_table = Table(table_data, colWidths=[40*mm, 60*mm, 40*mm, 50*mm])
+        history_table.setStyle(TableStyle([
+            # Header
+            ('BACKGROUND', (0, 0), (-1, 0), self.primary),
+            ('TEXTCOLOR', (0, 0), (-1, 0), colors.white),
+            ('FONTNAME', (0, 0), (-1, 0), 'Helvetica-Bold'),
+            ('FONTSIZE', (0, 0), (-1, 0), 8),
+            ('ALIGN', (0, 0), (-1, -1), 'LEFT'),
+            ('ALIGN', (3, 0), (3, -1), 'RIGHT'), # Align amount right
+            ('TOPPADDING', (0, 0), (-1, 0), 8),
+            ('BOTTOMPADDING', (0, 0), (-1, 0), 8),
+            # Rows
+            ('GRID', (0, 0), (-1, -1), 0.5, self.border),
+            ('ROWBACKGROUNDS', (0, 1), (-1, -1), [colors.white, self.bg_light]),
+            ('FONTSIZE', (0, 1), (-1, -1), 8),
+            ('PADDING', (0, 0), (-1, -1), 6),
+            ('VALIGN', (0, 0), (-1, -1), 'MIDDLE'),
+        ]))
+        
+        story.append(history_table)
+        story.append(Spacer(1, 5*mm))
+
+    def generate_receipt(self, order_data: Dict[str, Any], client_data: Dict[str, Any], payment_data: Dict[str, Any], payment_history: List[Dict[str, Any]], company_settings: Optional[Dict[str, Any]] = None) -> str:
+        """Generate professional payment receipt PDF."""
+        receipt_number = f"RCPT-{payment_data.get('id', 'NEW')}"
+        receipt_date = datetime.now().strftime('%Y-%m-%d')
+        
+        filename = f"receipt_{receipt_number}_{receipt_date}.pdf"
+        filepath = os.path.join(self.receipt_dir, filename)
+        
+        doc = SimpleDocTemplate(
+            filepath,
+            pagesize=A4,
+            rightMargin=10*mm,
+            leftMargin=10*mm,
+            topMargin=10*mm,
+            bottomMargin=10*mm
+        )
+        
+        story = []
+        styles = getSampleStyleSheet()
+        
+        self._create_header(story, styles, receipt_number, company_settings)
+        self._create_receipt_details(story, styles, order_data, client_data, payment_data)
+        self._create_amount_spotlight(story, styles, payment_data, company_settings)
+        self._create_payment_summary(story, styles, order_data, payment_history, company_settings)
+        self._create_payment_history(story, styles, payment_history, payment_data.get('id'), company_settings)
+        
+        # Footer Section (QR + Thank You + Bottom Bar)
+        # QR Code
+        qr_img = None
+        try:
+            amount = payment_data.get('amount', 0)
+            qr_data = f"RECEIPT:{receipt_number}|AMT:{amount}"
+            qr = qrcode.QRCode(version=1, box_size=3, border=2)
             qr.add_data(qr_data)
             qr.make(fit=True)
-
             img = qr.make_image(fill_color='black', back_color='white')
             img_buffer = io.BytesIO()
             img.save(img_buffer, format='PNG')
             img_buffer.seek(0)
+            qr_img = Image(img_buffer, width=20*mm, height=20*mm)
+        except Exception:
+            pass
 
-            qr_img = Image(img_buffer, width=50*mm, height=50*mm)
-
-            content_data = [
-                [
-                    qr_img,
-                    Paragraph(
-                        '<b><font size=12 color=#1e40af>Thank You for Your Payment!</font></b><br/>'
-                        '<font size=8 color=#475569>Payment successfully received and processed. '
-                        'Scan QR code to verify receipt online or contact support for assistance.</font><br/>'
-                        '<font size=7 color=#64748b><i>Please retain this receipt for your records.</i></font>',
-                        ParagraphStyle('TY', parent=styles['Normal'], alignment=TA_LEFT, leading=10)
-                    )
-                ]
-            ]
-
-            content_table = Table(content_data, colWidths=[60*mm, 135*mm])
-            content_table.setStyle(TableStyle([
-                ('ALIGN', (0, 0), (0, 0), 'CENTER'),
-                ('ALIGN', (1, 0), (1, 0), 'LEFT'),
-                ('VALIGN', (0, 0), (-1, -1), 'MIDDLE'),
-                ('LEFTPADDING', (1, 0), (1, 0), 10),
-                ('RIGHTPADDING', (1, 0), (1, 0), 10),
-                ('TOPPADDING', (0, 0), (-1, -1), 8),
-                ('BOTTOMPADDING', (0, 0), (-1, -1), 8),
-                ('BACKGROUND', (0, 0), (-1, -1), self.bg_light),
-                ('BOX', (0, 0), (-1, -1), 1, self.border),
-                ('ROUNDEDCORNERS', [6, 6, 6, 6]),
-            ]))
-
-            story.append(content_table)
-
-        except Exception as e:
-            print(f"Error generating QR code: {e}")
-            story.append(Paragraph(
-                '<b><font size=12 color=#1e40af>Thank You for Your Payment!</font></b>',
-                ParagraphStyle('TY', parent=styles['Normal'], alignment=TA_CENTER)
-            ))
-    
-    def _create_inline_footer(self, story, styles, company_settings: Optional[Dict[str, Any]] = None):
-        """Create professional inline footer section."""
-        story.append(Spacer(1, 10*mm))
-        
-        company_name = company_settings.get('company_name', settings.company_name) if company_settings else settings.company_name
-        company_phone = company_settings.get('company_phone', settings.company_phone) if company_settings else settings.company_phone
-        company_email = company_settings.get('company_email', settings.company_email) if company_settings else settings.company_email
-        company_address = company_settings.get('company_address', settings.company_address) if company_settings else settings.company_address
-        
-        # Professional footer with enhanced design
-        footer_content = [
-            [Paragraph(
-                f'<b><font size=12 color=#1e40af>{company_name}</font></b>',
-                ParagraphStyle('CompanyName', parent=styles['Normal'], alignment=TA_CENTER)
-            )],
-            [Paragraph(
-                '<font size=9 color=#475569>Professional Manufacturing Solutions & Business Management</font>',
-                ParagraphStyle('Tagline', parent=styles['Normal'], alignment=TA_CENTER)
-            )],
-            [Paragraph(
-                f'<font size=8 color=#64748b>📞 {company_phone} | ✉️ {company_email} | 📍 {company_address}</font>',
-                ParagraphStyle('Contact', parent=styles['Normal'], alignment=TA_CENTER)
-            )],
-            [Paragraph(
-                '<font size=7 color=#64748b><i>This is a computer-generated receipt. Thank you for your business and trust in our services.</i></font>',
-                ParagraphStyle('Disclaimer', parent=styles['Normal'], alignment=TA_CENTER)
-            )]
+        # Thank You Message
+        thank_you_text = [
+            Paragraph('<b>Thank You for Your Payment!</b>', ParagraphStyle('TY1', parent=styles['Normal'], fontSize=8, textColor=self.primary_dark)),
+            Paragraph('For any questions regarding this receipt, please contact our support.', ParagraphStyle('TY2', parent=styles['Normal'], fontSize=7, textColor=self.text_light)),
         ]
         
-        footer_table = Table(footer_content, colWidths=[195*mm])
+        # Layout: QR Left, Text Right (inside a grey box)
+        footer_content = []
+        if qr_img:
+            footer_content.append([qr_img, thank_you_text])
+        else:
+            footer_content.append([None, thank_you_text])
+            
+        footer_table = Table(footer_content, colWidths=[30*mm, 160*mm])
         footer_table.setStyle(TableStyle([
-            ('BACKGROUND', (0, 0), (-1, -1), colors.HexColor('#f8fafc')),
-            ('TOPPADDING', (0, 0), (0, 0), 8),
-            ('BOTTOMPADDING', (0, 0), (0, 0), 4),
-            ('TOPPADDING', (0, 1), (0, 1), 3),
-            ('BOTTOMPADDING', (0, 1), (0, 1), 4),
-            ('TOPPADDING', (0, 2), (0, 2), 4),
-            ('BOTTOMPADDING', (0, 2), (0, 2), 4),
-            ('TOPPADDING', (0, 3), (0, 3), 4),
-            ('BOTTOMPADDING', (0, 3), (0, 3), 8),
-            ('LINEABOVE', (0, 0), (-1, 0), 2, self.primary),
-            ('BOX', (0, 0), (-1, -1), 1, colors.HexColor('#e2e8f0')),
-            ('ROUNDEDCORNERS', [6, 6, 6, 6]),
+            ('VALIGN', (0, 0), (-1, -1), 'MIDDLE'),
+            ('BACKGROUND', (0, 0), (-1, -1), self.bg_light),
+            ('ROUNDEDCORNERS', [8, 8, 8, 8]),
+            ('TOPPADDING', (0, 0), (-1, -1), 8),
+            ('BOTTOMPADDING', (0, 0), (-1, -1), 8),
+            ('LEFTPADDING', (0, 0), (-1, -1), 8),
         ]))
-        
         story.append(footer_table)
+        story.append(Spacer(1, 4*mm))
 
-    def generate_receipt(
-        self,
-        payment_data: Dict[str, Any],
-        client_data: Dict[str, Any],
-        company_settings: Optional[Dict[str, Any]] = None
-    ) -> str:
-        """
-        Generate a professional A4 single-page payment receipt PDF.
-
-        Args:
-            payment_data: Dictionary containing payment information
-                - payment_id: UUID of the payment
-                - amount: Payment amount
-                - method: Payment method (Cash, Bank Transfer, etc.)
-                - status: Payment status
-                - payment_date: Date of payment
-                - reference_number: Optional reference number
-            client_data: Dictionary containing client/leader information
-                - name: Client name
-                - type: Client type (School/Dealer)
-                - contact: Contact information
-                - address: Client address
-
-        Returns:
-            str: Path to the generated PDF file
-        """
-        payment_id = payment_data.get('payment_id', '')
-        payment_date = payment_data.get('payment_date', datetime.now())
-        reference_number = payment_data.get('reference_number', '')
-
-        if isinstance(payment_date, str):
-            try:
-                payment_date = datetime.fromisoformat(payment_date.replace('Z', '+00:00'))
-            except:
-                payment_date = datetime.now()
-
-        date_str = payment_date.strftime('%Y-%m-%d')
-        receipt_number = f"RCPT-{str(payment_id)[:8].upper()}"
-        payment_data['receipt_number'] = receipt_number
-
-        filename = f"receipt_{reference_number}_{date_str}.pdf" if reference_number else f"receipt_{str(payment_id)[:8]}_{date_str}.pdf"
-        filepath = os.path.join(self.invoice_dir, filename)
-
-        # Create PDF with optimized A4 margins for maximum content area
-        doc = SimpleDocTemplate(
-            filepath,
-            pagesize=A4,
-            rightMargin=12*mm,
-            leftMargin=12*mm,
-            topMargin=8*mm,
-            bottomMargin=12*mm,
+        # Bottom Bar
+        company_name = (company_settings or {}).get('company_name', settings.company_name)
+        company_address = (company_settings or {}).get('company_address', settings.company_address)
+        
+        bottom_bar = Paragraph(
+            f'<b>{company_name}</b> | {company_address} | Professional Manufacturing Solutions',
+            ParagraphStyle('BottomBar', parent=styles['Normal'], alignment=TA_CENTER, fontSize=7, textColor=self.text_light)
         )
-
-        story = []
-        styles = getSampleStyleSheet()
-
-        # Build premium single-page receipt
-        self._create_premium_header(story, styles, receipt_number, payment_data, company_settings)
-        self._create_info_section(story, styles, payment_data, client_data)
-        self._create_amount_spotlight(story, styles, payment_data, company_settings)
-        self._create_qr_and_thankyou(story, styles, payment_data)
-        self._create_inline_footer(story, styles, company_settings)
-
-        # Build PDF
+        
+        # Add a line before bottom bar
+        story.append(Table([['']], colWidths=[190*mm], style=TableStyle([('LINEABOVE', (0,0), (-1,-1), 1, self.primary_light)])))
+        story.append(Spacer(1, 2*mm))
+        story.append(bottom_bar)
+        
         doc.build(story)
-
         return filepath
 
-
 # Global instance
-payment_receipt_generator = ProfessionalInvoiceGenerator()
+payment_receipt_generator = PaymentReceiptGenerator()
