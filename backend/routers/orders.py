@@ -1,8 +1,9 @@
 from fastapi import APIRouter, Depends, HTTPException, status
+from uuid import UUID
 from sqlmodel import Session, select
 from typing import List
 from database import get_session
-from models import Order, OrderCreate, OrderRead, Client, User, OrderStatus, Settings
+from models import Order, OrderCreate, OrderRead, Client, User, OrderStatus, Settings, Payment, PaymentMode, PaymentStatus
 from utils.auth import get_current_user
 from services.invoice_generator import invoice_generator
 import os
@@ -108,12 +109,22 @@ def create_order(
     try:
         # Convert frontend field names to backend field names
         order_dict = order_data.dict()
+        
+        # Extract payment details
+        initial_payment = order_dict.pop('initialPayment', 0.0)
+        payment_mode = order_dict.pop('paymentMode', 'Cash')
+        payment_date_str = order_dict.pop('paymentDate', None)
+        
         if 'orderNumber' in order_dict:
             order_dict['order_number'] = order_dict.pop('orderNumber')
         if 'leaderId' in order_dict:
             order_dict['client_id'] = order_dict.pop('leaderId')
         if 'totalAmount' in order_dict:
             order_dict['total_amount'] = order_dict.pop('totalAmount')
+            
+        # Calculate balance
+        order_dict['paid_amount'] = float(initial_payment) if initial_payment else 0.0
+        order_dict['balance'] = float(order_dict['total_amount']) - order_dict['paid_amount']
         
         # Verify client exists
         client_statement = select(Client).where(Client.id == order_dict.get('client_id'))
@@ -130,6 +141,42 @@ def create_order(
         session.commit()
         session.refresh(db_order)
         
+        # Handle initial payment if provided
+        if initial_payment and float(initial_payment) > 0:
+            try:
+                # Parse payment date
+                from datetime import datetime
+                payment_date = datetime.utcnow()
+                if payment_date_str:
+                    try:
+                        payment_date = datetime.fromisoformat(payment_date_str.split('T')[0])
+                    except ValueError:
+                        pass
+
+                # Map payment mode
+                mode_map = {
+                    "Cash": PaymentMode.CASH,
+                    "Bank Transfer": PaymentMode.BANK_TRANSFER,
+                    "Cheque": PaymentMode.CHEQUE,
+                    "UPI": PaymentMode.UPI
+                }
+                mode = mode_map.get(payment_mode, PaymentMode.CASH)
+
+                payment = Payment(
+                    amount=float(initial_payment),
+                    mode=mode,
+                    status=PaymentStatus.COMPLETED,
+                    client_id=db_order.client_id,
+                    order_id=db_order.id,
+                    payment_date=payment_date,
+                    reference_number=f"INIT-{db_order.order_number}"
+                )
+                session.add(payment)
+                session.commit()
+            except Exception as e:
+                print(f"Error creating initial payment: {e}")
+                # Don't fail the order creation if payment fails, but log it
+                
         return db_order
     except HTTPException:
         raise
@@ -269,7 +316,9 @@ def generate_invoice(
     order_dict = {
         "order_number": order.order_number,
         "order_date": order.order_date.isoformat(),
-        "total_amount": order.total_amount,
+        "total_amount": float(order.total_amount),  # Explicit float conversion
+        "paid_amount": float(order.paid_amount),    # Required for payment summary
+        "balance": float(order.balance),            # Required for payment summary
         "status": order.status
     }
     
@@ -293,7 +342,39 @@ def generate_invoice(
             "currency_symbol": company_settings.currency_symbol
         }
     
-    invoice_path = invoice_generator.generate_invoice(order_dict, client_dict, settings_dict)
+
+    # Fetch payment history for this order
+    print(f"DEBUG: Fetching payment history for order_id: {order_id} (Type: {type(order_id)})")
+    try:
+        # Ensure order_id is UUID for query
+        oid = UUID(str(order_id)) if isinstance(order_id, str) else order_id
+        history_statement = select(Payment).where(Payment.order_id == oid).order_by(Payment.payment_date)
+        history_results = session.exec(history_statement).all()
+        print(f"DEBUG: Found {len(history_results)} payments for order {oid}")
+    except Exception as e:
+        print(f"ERROR: Failed to fetch payment history: {e}")
+        history_results = []
+    
+    payment_history = []
+    for p in history_results:
+        payment_history.append({
+            "id": str(p.id),
+            "payment_date": p.payment_date.isoformat() if p.payment_date else datetime.utcnow().isoformat(),
+            "amount": float(p.amount),
+            "mode": p.mode.value if hasattr(p.mode, 'value') else str(p.mode),
+            "reference_number": p.reference_number
+        })
+    
+    print(f"DEBUG: Payment history for invoice: {payment_history}")
+    print(f"DEBUG: Order Total Amount: {order_dict['total_amount']} (Type: {type(order_dict['total_amount'])})")
+    
+    # Ensure total_amount is float
+    try:
+        order_dict['total_amount'] = float(order_dict['total_amount'])
+    except (ValueError, TypeError):
+        print(f"WARNING: Could not convert total_amount to float: {order_dict['total_amount']}")
+
+    invoice_path = invoice_generator.generate_invoice(order_dict, client_dict, settings_dict, payment_history)
     
     if os.path.exists(invoice_path):
         return FileResponse(

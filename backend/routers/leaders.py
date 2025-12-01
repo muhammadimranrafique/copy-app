@@ -2,7 +2,7 @@ from fastapi import APIRouter, Depends, HTTPException, status
 from sqlmodel import Session, select
 from typing import List
 from database import get_session
-from models import Client, ClientCreate, ClientRead, User
+from models import Client, ClientCreate, ClientRead, User, Order, Payment
 from utils.auth import get_current_user
 
 router = APIRouter(prefix="/leaders", tags=["Leaders"])
@@ -100,3 +100,69 @@ def delete_leader(
     session.commit()
     return None
 
+@router.get("/{leader_id}/ledger")
+def get_leader_ledger(
+    leader_id: str,
+    session: Session = Depends(get_session),
+    current_user: User = Depends(get_current_user)
+):
+    """Get ledger for a specific leader."""
+    # Fetch the client to get opening balance
+    client = session.exec(select(Client).where(Client.id == leader_id)).first()
+    if not client:
+        raise HTTPException(status_code=404, detail="Leader not found")
+    
+    # Fetch orders
+    orders = session.exec(select(Order).where(Order.client_id == leader_id)).all()
+    
+    # Fetch payments
+    payments = session.exec(select(Payment).where(Payment.client_id == leader_id)).all()
+    
+    ledger_entries = []
+    
+    # Add opening balance as the first entry if it exists
+    if client.opening_balance != 0:
+        ledger_entries.append({
+            "id": "opening_balance",
+            "date": client.created_at,
+            "type": "OPENING",
+            "description": "Opening Balance",
+            "debit": client.opening_balance if client.opening_balance > 0 else 0,
+            "credit": abs(client.opening_balance) if client.opening_balance < 0 else 0,
+            "reference": "Opening"
+        })
+    
+    for order in orders:
+        ledger_entries.append({
+            "id": str(order.id),
+            "date": order.order_date,
+            "type": "ORDER",
+            "description": f"Order #{order.order_number}",
+            "debit": order.total_amount,
+            "credit": 0,
+            "reference": order.order_number
+        })
+        
+    for payment in payments:
+        ledger_entries.append({
+            "id": str(payment.id),
+            "date": payment.payment_date,
+            "type": "PAYMENT",
+            "description": f"Payment ({payment.mode})",
+            "debit": 0,
+            "credit": payment.amount,
+            "reference": payment.reference_number
+        })
+        
+    # Sort by date
+    ledger_entries.sort(key=lambda x: x['date'])
+    
+    # Calculate running balance starting with opening balance
+    balance = client.opening_balance
+    for entry in ledger_entries:
+        # Skip adding opening balance to itself
+        if entry['type'] != 'OPENING':
+            balance += entry['debit'] - entry['credit']
+        entry['balance'] = balance
+        
+    return ledger_entries

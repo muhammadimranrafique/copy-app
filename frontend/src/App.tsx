@@ -8,6 +8,7 @@ import Products from '@/pages/Products';
 import Orders from '@/pages/Orders';
 import Payments from '@/pages/Payments';
 import Expenses from '@/pages/Expenses';
+import Ledger from '@/pages/Ledger';
 import Settings from '@/pages/Settings';
 import { Toaster } from 'sonner';
 
@@ -28,6 +29,7 @@ export default function App() {
                   <Route path="/orders" element={<Orders />} />
                   <Route path="/payments" element={<Payments />} />
                   <Route path="/expenses" element={<Expenses />} />
+                  <Route path="/ledger" element={<Ledger />} />
                   <Route path="/settings" element={<Settings />} />
                   <Route path="*" element={<Navigate to="/" replace />} />
                 </Routes>

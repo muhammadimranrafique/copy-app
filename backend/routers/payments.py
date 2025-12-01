@@ -1,10 +1,11 @@
 from fastapi import APIRouter, Depends, HTTPException, status
+from uuid import UUID
 from fastapi.responses import FileResponse
 from sqlmodel import Session, select
 from typing import List
 from datetime import datetime
 from database import get_session
-from models import Payment, PaymentCreate, PaymentRead, Order, User, PaymentStatus, PaymentMode, Client, Settings
+from models import Payment, PaymentCreate, PaymentRead, Order, User, PaymentStatus, PaymentMode, Client, Settings, OrderStatus
 from utils.auth import get_current_user
 from sqlalchemy.orm import joinedload
 from services.payment_receipt_generator import payment_receipt_generator
@@ -80,14 +81,21 @@ def create_payment(
     session: Session = Depends(get_session),
     current_user: User = Depends(get_current_user)
 ):
-    """Record a new payment."""
+    """Record a new payment with validation to prevent overpayment."""
     try:
         print(f"Creating payment with data: {payment_data.dict()}")
-        
+
+        # Validate payment amount is positive
+        if payment_data.amount <= 0:
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail="Payment amount must be a positive number"
+            )
+
         # Verify client exists first
         client_statement = select(Client).where(Client.id == payment_data.leaderId)
         client = session.exec(client_statement).first()
-        
+
         if not client:
             print(f"Client not found with ID: {payment_data.leaderId}")
             raise HTTPException(
@@ -97,6 +105,24 @@ def create_payment(
 
         print(f"Found client: {client.name}")
 
+        # Validate against order balance BEFORE creating payment
+        order = None
+        if payment_data.orderId:
+            order_statement = select(Order).where(Order.id == payment_data.orderId)
+            order = session.exec(order_statement).first()
+            if order:
+                # Validation: Ensure payment doesn't exceed remaining balance
+                if float(payment_data.amount) > order.balance:
+                    raise HTTPException(
+                        status_code=status.HTTP_400_BAD_REQUEST,
+                        detail=f"Payment amount ({payment_data.amount:,.2f}) exceeds order balance ({order.balance:,.2f}). Maximum allowed payment: {order.balance:,.2f}"
+                    )
+            else:
+                raise HTTPException(
+                    status_code=status.HTTP_404_NOT_FOUND,
+                    detail=f"Order not found with ID: {payment_data.orderId}"
+                )
+
         # Handle payment method mapping
         method_str = payment_data.method.upper().replace(" ", "_")
         method_mapping = {
@@ -105,7 +131,7 @@ def create_payment(
             "CHEQUE": PaymentMode.CHEQUE,
             "UPI": PaymentMode.UPI
         }
-        
+
         mode = method_mapping.get(method_str, PaymentMode.CASH)
         print(f"Mapped payment method {payment_data.method} to {mode}")
 
@@ -122,25 +148,47 @@ def create_payment(
 
         print(f"Using payment date: {payment_date}")
 
-        # Create and validate payment object
+        # Create payment object with order_id if linked
         db_payment = Payment(
             amount=float(payment_data.amount),
             mode=mode,
             status=PaymentStatus.COMPLETED,
             reference_number=payment_data.referenceNumber,
             client_id=payment_data.leaderId,
-            payment_date=payment_date
+            payment_date=payment_date,
+            order_id=payment_data.orderId  # Link payment to order
         )
-        
+
         print("Adding payment to session")
         session.add(db_payment)
-        
+
+        # Update Order if linked
+        if order:
+            order.paid_amount += db_payment.amount
+            order.balance = order.total_amount - order.paid_amount
+
+            # Update payment status based on balance
+            # "Unpaid": When total_paid = 0
+            # "Partially Paid": When 0 < total_paid < order_total
+            # "Fully Paid": When total_paid >= order_total
+            if order.balance <= 0:
+                order.status = OrderStatus.PAID
+            elif order.paid_amount > 0:
+                order.status = OrderStatus.PARTIALLY_PAID
+            else:
+                order.status = OrderStatus.PENDING  # Unpaid state
+
+            session.add(order)
+
         print("Committing transaction")
         session.commit()
-        
+
         print("Refreshing payment object")
         session.refresh(db_payment)
-        
+
+        if order:
+            session.refresh(order)
+
         # Create response with complete client data
         payment_dict = db_payment.model_dump()
         payment_dict["client"] = {
@@ -153,10 +201,10 @@ def create_payment(
         # Convert enum values to strings
         payment_dict["status"] = db_payment.status.value if hasattr(db_payment.status, 'value') else str(db_payment.status)
         payment_dict["mode"] = db_payment.mode.value if hasattr(db_payment.mode, 'value') else str(db_payment.mode)
-        
+
         print(f"Payment created successfully with ID: {db_payment.id}")
         return PaymentRead(**payment_dict)
-        
+
     except HTTPException as he:
         print(f"HTTP Exception in payment creation: {str(he)}")
         raise
@@ -242,6 +290,8 @@ def generate_payment_receipt(
     - Company branding and header
     - Payment details (amount, method, date, reference)
     - Client/Leader information
+    - Payment Summary (if linked to an order)
+    - Payment History (if linked to an order)
     - QR code for verification
     - Professional footer with page numbers
 
@@ -270,9 +320,10 @@ def generate_payment_receipt(
 
         # Prepare payment data for PDF generation
         payment_data = {
+            "id": str(payment.id),  # Required by PDF generator for receipt numbering
             "payment_id": str(payment.id),
             "amount": float(payment.amount),
-            "method": payment.mode.value if hasattr(payment.mode, 'value') else str(payment.mode),
+            "mode": payment.mode.value if hasattr(payment.mode, 'value') else str(payment.mode),
             "status": payment.status.value if hasattr(payment.status, 'value') else str(payment.status),
             "payment_date": payment.payment_date.isoformat() if payment.payment_date else datetime.utcnow().isoformat(),
             "reference_number": payment.reference_number if payment.reference_number else "",
@@ -299,13 +350,62 @@ def generate_payment_receipt(
                 "currency_symbol": company_settings_obj.currency_symbol
             }
 
+        # Fetch Order Data and Payment History if linked
+        order_data = None
+        payment_history = None
+        
+        if payment.order_id:
+            order_statement = select(Order).where(Order.id == payment.order_id)
+            order = session.exec(order_statement).first()
+            
+            if order:
+                order_data = {
+                    "order_number": order.order_number,
+                    "total_amount": float(order.total_amount),  # Explicit float conversion
+                    "paid_amount": float(order.paid_amount),    # Explicit float conversion
+                    "balance": float(order.balance)             # Explicit float conversion
+                }
+                
+
+                # Fetch payment history for this order
+                print(f"DEBUG: Fetching payment history for order_id: {payment.order_id} (Type: {type(payment.order_id)})")
+                try:
+                    # Ensure order_id is UUID for query
+                    oid = payment.order_id
+                    if isinstance(oid, str):
+                        oid = UUID(oid)
+                    
+                    history_statement = select(Payment).where(Payment.order_id == oid).order_by(Payment.payment_date)
+                    history_results = session.exec(history_statement).all()
+                    print(f"DEBUG: Found {len(history_results)} payments for order {oid}")
+                except Exception as e:
+                    print(f"ERROR: Failed to fetch payment history: {e}")
+                    history_results = []
+                
+                payment_history = []
+                for p in history_results:
+                    payment_history.append({
+                        "id": str(p.id),
+                        "payment_date": p.payment_date.isoformat() if p.payment_date else datetime.utcnow().isoformat(),
+                        "amount": float(p.amount),
+                        "mode": p.mode.value if hasattr(p.mode, 'value') else str(p.mode),
+                        "reference_number": p.reference_number
+                    })
+
         print(f"Generating receipt for payment {payment_id}")
         print(f"Payment data: {payment_data}")
         print(f"Client data: {client_data}")
         print(f"Company settings: {company_settings}")
+        print(f"Order data: {order_data}")
 
         # Generate the PDF receipt
-        receipt_path = payment_receipt_generator.generate_receipt(payment_data, client_data, company_settings)
+        receipt_path = payment_receipt_generator.generate_receipt(
+            order_data=order_data,
+            client_data=client_data,
+            payment_data=payment_data,
+            payment_history=payment_history,
+            company_settings=company_settings
+        )
 
         if not os.path.exists(receipt_path):
             raise HTTPException(

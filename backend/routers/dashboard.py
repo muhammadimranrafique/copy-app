@@ -2,7 +2,7 @@ from fastapi import APIRouter, Depends, HTTPException, status
 from sqlmodel import Session, select
 from sqlalchemy.orm import selectinload, joinedload
 from database import get_session
-from models import Order, Payment, Expense, User, Client
+from models import Order, Payment, Expense, User, Client, OrderStatus
 from utils.auth import get_current_user
 from datetime import datetime, timedelta
 from typing import Optional
@@ -51,7 +51,7 @@ def get_dashboard_stats(
         net_profit = total_revenue - total_expenses
         
         # Get pending orders
-        pending_orders = [o for o in orders if o.status == "Pending"]
+        pending_orders = [o for o in orders if o.status == OrderStatus.PENDING or (hasattr(o.status, 'value') and o.status.value == "Pending") or str(o.status) == "Pending"]
         
         # Get recent orders (last 5) with client info
         recent_orders_raw = sorted(orders, key=lambda x: x.created_at, reverse=True)[:5]
@@ -62,7 +62,7 @@ def get_dashboard_stats(
                 "orderNumber": order.order_number,
                 "leaderId": str(order.client_id),
                 "totalAmount": order.total_amount,
-                "status": order.status,
+                "status": order.status.value if hasattr(order.status, 'value') else str(order.status),
                 "orderDate": order.order_date.isoformat(),
                 "createdAt": order.created_at.isoformat(),
                 "leaderName": order.client.name if order.client else "N/A"

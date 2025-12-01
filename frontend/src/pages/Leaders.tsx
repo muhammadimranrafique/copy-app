@@ -2,7 +2,7 @@ import { useState } from 'react';
 import { Plus, Search } from 'lucide-react';
 import { useCurrency } from '@/hooks/useCurrency';
 import { useAuth } from '@/lib/useAuth';
-import { getLeaders, createLeader } from '@/lib/mock-api';
+import { api } from '@/lib/api-client';
 import { useAuthenticatedQuery } from '@/hooks/useAuthenticatedQuery';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -19,7 +19,7 @@ interface Leader {
   type: string;
   contact: string;
   address: string;
-  openingBalance: number;
+  opening_balance: number;
 }
 
 export default function Leaders() {
@@ -32,7 +32,7 @@ export default function Leaders() {
     type: 'School',
     contact: '',
     address: '',
-    openingBalance: 0
+    opening_balance: 0
   });
 
   const {
@@ -40,22 +40,22 @@ export default function Leaders() {
     loading,
     refetch: loadLeaders
   } = useAuthenticatedQuery(
-    () => getLeaders({}),
+    () => api.getLeaders({}),
     {
       isReady: !authLoading && !!user,
       onError: () => toast.error('Failed to load leaders')
     }
   );
 
-  const leaders = leadersData?.leaders ?? [];
+  const leaders = leadersData?.items ?? [];
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     try {
-      await createLeader(formData);
+      await api.createLeader(formData);
       toast.success('Leader created successfully');
       setDialogOpen(false);
-      setFormData({ name: '', type: 'School', contact: '', address: '', openingBalance: 0 });
+      setFormData({ name: '', type: 'School', contact: '', address: '', opening_balance: 0 });
       loadLeaders();
     } catch (error) {
       toast.error('Failed to create leader');
@@ -128,8 +128,8 @@ export default function Leaders() {
                 <Input
                   id="balance"
                   type="number"
-                  value={formData.openingBalance}
-                  onChange={(e) => setFormData({ ...formData, openingBalance: parseFloat(e.target.value) || 0 })}
+                  value={formData.opening_balance}
+                  onChange={(e) => setFormData({ ...formData, opening_balance: parseFloat(e.target.value) || 0 })}
                 />
               </div>
               <Button type="submit" className="w-full">Create Leader</Button>
@@ -177,8 +177,8 @@ export default function Leaders() {
                 </div>
                 <div>
                   <p className="text-xs sm:text-sm text-muted-foreground">Balance</p>
-                  <p className={`font-semibold text-sm sm:text-base ${(leader.openingBalance || 0) >= 0 ? 'text-green-600' : 'text-red-600'}`}>
-                    {formatCurrency(leader.openingBalance || 0)}
+                  <p className={`font-semibold text-sm sm:text-base ${(leader.opening_balance || 0) >= 0 ? 'text-green-600' : 'text-red-600'}`}>
+                    {formatCurrency(leader.opening_balance || 0)}
                   </p>
                 </div>
               </CardContent>

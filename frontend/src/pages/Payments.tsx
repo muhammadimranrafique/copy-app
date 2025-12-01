@@ -1,5 +1,7 @@
 import { useState } from 'react';
 import { Plus, DollarSign, Download, Banknote, CreditCard, Receipt, Smartphone, Building2, User, School } from 'lucide-react';
+import { api } from '@/lib/api-client';
+import { useEffect } from 'react';
 import { useCurrency } from '@/hooks/useCurrency';
 import { useAuth } from '@/lib/useAuth';
 import { getPayments, createPayment, getLeaders, downloadPaymentReceipt } from '@/lib/mock-api';
@@ -38,8 +40,27 @@ export default function Payments() {
     method: 'Cash',
     paymentDate: new Date().toISOString().split('T')[0],
     leaderId: '',
-    referenceNumber: ''
+    referenceNumber: '',
+    orderId: ''
   });
+  const [leaderOrders, setLeaderOrders] = useState<any[]>([]);
+
+  useEffect(() => {
+    if (formData.leaderId) {
+      const fetchOrders = async () => {
+        try {
+          // @ts-ignore
+          const orders = await api.getOrdersByLeader(formData.leaderId);
+          setLeaderOrders(orders);
+        } catch (error) {
+          console.error('Failed to fetch orders', error);
+        }
+      };
+      fetchOrders();
+    } else {
+      setLeaderOrders([]);
+    }
+  }, [formData.leaderId]);
 
   const {
     data: paymentsData,
@@ -74,7 +95,7 @@ export default function Payments() {
       toast.error('Please select a leader');
       return;
     }
-    
+
     if (formData.amount <= 0) {
       toast.error('Amount must be greater than 0');
       return;
@@ -84,14 +105,14 @@ export default function Payments() {
     if (import.meta.env.VITE_DEBUG === 'true') {
       console.debug('[Payment Form Data]', formData);
     }
-    
+
     try {
       const result = await createPayment({
         ...formData,
         amount: Number(formData.amount),
         paymentDate: formData.paymentDate ? new Date(formData.paymentDate).toISOString() : undefined
       });
-      
+
       if (import.meta.env.VITE_DEBUG === 'true') {
         console.debug('[Payment Result]', result);
       }
@@ -103,7 +124,8 @@ export default function Payments() {
         method: 'Cash',
         paymentDate: new Date().toISOString().split('T')[0],
         leaderId: '',
-        referenceNumber: ''
+        referenceNumber: '',
+        orderId: ''
       });
       refetchPayments();
     } catch (error: any) {
@@ -131,8 +153,6 @@ export default function Payments() {
     };
     return colors[method || 'Cash'] || 'bg-gray-100 text-gray-700 border-gray-200';
   };
-
-
 
   const formatAmount = (amount: number): string => {
     return `Rs ${amount.toLocaleString('en-PK', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;

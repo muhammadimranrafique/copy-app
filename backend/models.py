@@ -12,6 +12,7 @@ class ClientType(str, Enum):
 
 class OrderStatus(str, Enum):
     PENDING = "Pending"
+    PARTIALLY_PAID = "Partially Paid"
     IN_PRODUCTION = "In Production"
     DELIVERED = "Delivered"
     PAID = "Paid"
@@ -113,6 +114,10 @@ class Order(OrderBase, table=True):
     order_date: datetime = Field(default_factory=datetime.utcnow)
     created_at: datetime = Field(default_factory=datetime.utcnow)
     
+    # Payment tracking
+    paid_amount: float = Field(default=0.0)
+    balance: float = Field(default=0.0)
+    
     # Ensure client relationship is properly loaded
     client: "Client" = Relationship(
         back_populates="orders",
@@ -128,12 +133,18 @@ class OrderCreate(SQLModel):
     leaderId: UUID
     totalAmount: float
     status: str = "Pending"
+    # Initial Payment Details
+    initialPayment: Optional[float] = 0.0
+    paymentMode: Optional[str] = "Cash"
+    paymentDate: Optional[str] = None
 
 class OrderRead(SQLModel):
     id: UUID
     orderNumber: str = PydanticField(..., alias="order_number")
     leaderId: UUID = PydanticField(..., alias="client_id")
     totalAmount: float = PydanticField(..., alias="total_amount")
+    paidAmount: float = PydanticField(default=0.0, alias="paid_amount")
+    balance: float = PydanticField(default=0.0, alias="balance")
     status: str = PydanticField(..., alias="status")
     orderDate: datetime = PydanticField(..., alias="order_date")
     createdAt: datetime = PydanticField(..., alias="created_at")
