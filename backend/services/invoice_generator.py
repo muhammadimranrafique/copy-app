@@ -42,9 +42,9 @@ class ProfessionalInvoiceGenerator:
         
         # Left: Company Info
         company_info = Paragraph(
-            f'<b><font size=20 color={self.primary_dark}>{company_name}</font></b><br/>'
+            f'<b><font size=18 color={self.primary_dark}>{company_name}</font></b><br/>'
             f'<font size=9 color={self.text_light}>Professional Manufacturing Solutions</font>',
-            ParagraphStyle('CompanyInfo', parent=styles['Normal'], leading=14)
+            ParagraphStyle('CompanyInfo', parent=styles['Normal'], leading=13)
         )
 
         # Right: Invoice Badge (Blue Box)
@@ -75,7 +75,7 @@ class ProfessionalInvoiceGenerator:
         ]))
         
         story.append(header_table)
-        story.append(Spacer(1, 5*mm))
+        story.append(Spacer(1, 4*mm))
 
     def _create_info_section(self, story, styles, order_data: Dict[str, Any], client_data: Dict[str, Any]):
         """Create two distinct cards for Bill To and Invoice Details."""
@@ -90,16 +90,16 @@ class ProfessionalInvoiceGenerator:
         
         # --- Left Card: BILL TO ---
         bill_to_header = Paragraph(
-            '<b><font size=11 color=#1e40af>BILL TO</font></b>',
+            '<b><font size=12 color=#1e40af>BILL TO</font></b>',
             ParagraphStyle('CardHeader', parent=styles['Normal'], spaceAfter=0)
         )
         
         bill_to_content = [
             [bill_to_header],
-            [Paragraph(f'<b><font size=12>{client_data.get("name", "N/A")}</font></b>', styles['Normal'])],
-            [Paragraph(f'<font size=9 color=#64748b>Type: {client_data.get("type", "N/A")}</font>', styles['Normal'])],
-            [Paragraph(f'<font size=9 color=#64748b>Contact: {client_data.get("contact", "N/A")}</font>', styles['Normal'])],
-            [Paragraph(f'<font size=9 color=#64748b>Address: {client_data.get("address", "N/A")}</font>', styles['Normal'])],
+            [Paragraph(f'<b><font size=11>{client_data.get("name", "N/A")}</font></b>', styles['Normal'])],
+            [Paragraph(f'<font size=10 color=#64748b>Type: {client_data.get("type", "N/A")}</font>', styles['Normal'])],
+            [Paragraph(f'<font size=10 color=#64748b>Contact: {client_data.get("contact", "N/A")}</font>', styles['Normal'])],
+            [Paragraph(f'<font size=10 color=#64748b>Address: {client_data.get("address", "N/A")}</font>', styles['Normal'])],
         ]
         
         bill_to_table = Table(bill_to_content, colWidths=[90*mm])
@@ -122,14 +122,14 @@ class ProfessionalInvoiceGenerator:
 
         # --- Right Card: INVOICE DETAILS ---
         details_header = Paragraph(
-            '<b><font size=11 color=#1e40af>INVOICE DETAILS</font></b>',
+            '<b><font size=12 color=#1e40af>INVOICE DETAILS</font></b>',
             ParagraphStyle('CardHeader', parent=styles['Normal'], spaceAfter=0)
         )
         
         details_content = [
             [details_header],
-            [Paragraph(f'<b>Date:</b> {formatted_date}', ParagraphStyle('DetailText', parent=styles['Normal'], fontSize=9))],
-            [Paragraph(f'<b>Status:</b> {order_data.get("status", "Pending")}', ParagraphStyle('DetailText', parent=styles['Normal'], fontSize=9))],
+            [Paragraph(f'<b>Date:</b> {formatted_date}', ParagraphStyle('DetailText', parent=styles['Normal'], fontSize=10))],
+            [Paragraph(f'<b>Status:</b> {order_data.get("status", "Pending")}', ParagraphStyle('DetailText', parent=styles['Normal'], fontSize=10))],
         ]
         
         details_table = Table(details_content, colWidths=[90*mm])
@@ -159,7 +159,7 @@ class ProfessionalInvoiceGenerator:
         ]))
         
         story.append(cards_layout)
-        story.append(Spacer(1, 4*mm))
+        story.append(Spacer(1, 3*mm))
 
     def _create_items_table(self, story, styles, order_data: Dict[str, Any], company_settings: Optional[Dict[str, Any]] = None):
         """Create professional items table with modern styling."""
@@ -185,7 +185,7 @@ class ProfessionalInvoiceGenerator:
             ('BACKGROUND', (0, 0), (-1, 0), self.primary),
             ('TEXTCOLOR', (0, 0), (-1, 0), colors.white),
             ('FONTNAME', (0, 0), (-1, 0), 'Helvetica-Bold'),
-            ('FONTSIZE', (0, 0), (-1, 0), 9),
+            ('FONTSIZE', (0, 0), (-1, 0), 10),
             ('ALIGN', (0, 0), (-1, -1), 'LEFT'),
             ('ALIGN', (1, 0), (-1, -1), 'CENTER'),
             ('ALIGN', (2, 0), (-1, -1), 'RIGHT'),
@@ -194,12 +194,13 @@ class ProfessionalInvoiceGenerator:
             # Rows
             ('GRID', (0, 0), (-1, -1), 0.5, self.border_color),
             ('ROWBACKGROUNDS', (0, 1), (-1, -1), [colors.white, self.bg_light]),
+            ('FONTSIZE', (0, 1), (-1, -1), 10),
             ('PADDING', (0, 0), (-1, -1), 6),
             ('VALIGN', (0, 0), (-1, -1), 'MIDDLE'),
         ]))
         
         story.append(items_table)
-        story.append(Spacer(1, 4*mm))
+        story.append(Spacer(1, 3*mm))
         
         # Totals Section (Modern Card Style)
         totals_data = [
@@ -218,7 +219,7 @@ class ProfessionalInvoiceGenerator:
             ('TOPPADDING', (0, 0), (-1, -1), 5),
             # Total Row Styling
             ('FONTNAME', (0, -1), (-1, -1), 'Helvetica-Bold'),
-            ('FONTSIZE', (0, -1), (-1, -1), 11),
+            ('FONTSIZE', (0, -1), (-1, -1), 12),
             ('TEXTCOLOR', (0, -1), (-1, -1), self.primary_dark),
             ('LINEABOVE', (0, -1), (-1, -1), 1, self.border_color),
             ('TOPPADDING', (0, -1), (-1, -1), 8),
@@ -236,7 +237,7 @@ class ProfessionalInvoiceGenerator:
         ]))
         
         story.append(totals_container)
-        story.append(Spacer(1, 5*mm))
+        story.append(Spacer(1, 4*mm))
 
     def _create_payment_summary(self, story, styles, order_data: Dict[str, Any], payment_history: Optional[List[Dict[str, Any]]], company_settings: Optional[Dict[str, Any]] = None):
         """Create conditional payment summary matching the reference image style."""
@@ -268,28 +269,28 @@ class ProfessionalInvoiceGenerator:
 
         currency_symbol = (company_settings or {}).get('currency_symbol', 'Rs')
 
-        # Section Header (INCREASED FONT SIZE)
+        # Section Header (BALANCED FONT SIZE)
         story.append(Paragraph(
             f'<b><font color={self.primary_dark}>■ PAYMENT SUMMARY</font></b>',
-            ParagraphStyle('SummaryHeader', parent=styles['Normal'], fontSize=13, spaceAfter=2)
+            ParagraphStyle('SummaryHeader', parent=styles['Normal'], fontSize=12, spaceAfter=2)
         ))
         story.append(Spacer(1, 2*mm))
 
         # Summary Table (3 Columns to match our data, styled like the 4-column one in image)
-        # Headers (INCREASED FONT SIZE from 8 to 10)
+        # Headers (BALANCED FONT SIZE)
         headers = [
-            Paragraph('<b>Total Order Amount</b>', ParagraphStyle('H1', parent=styles['Normal'], alignment=TA_CENTER, fontSize=10, textColor=self.text_medium)),
-            Paragraph('<b>Total Paid to Date</b>', ParagraphStyle('H2', parent=styles['Normal'], alignment=TA_CENTER, fontSize=10, textColor=self.text_medium)),
-            Paragraph('<b>Remaining Balance</b>', ParagraphStyle('H3', parent=styles['Normal'], alignment=TA_CENTER, fontSize=10, textColor=self.text_medium)),
+            Paragraph('<b>Total Order Amount</b>', ParagraphStyle('H1', parent=styles['Normal'], alignment=TA_CENTER, fontSize=9, textColor=self.text_medium)),
+            Paragraph('<b>Total Paid to Date</b>', ParagraphStyle('H2', parent=styles['Normal'], alignment=TA_CENTER, fontSize=9, textColor=self.text_medium)),
+            Paragraph('<b>Remaining Balance</b>', ParagraphStyle('H3', parent=styles['Normal'], alignment=TA_CENTER, fontSize=9, textColor=self.text_medium)),
         ]
         
-        # Values (INCREASED FONT SIZE from 14 to 16)
+        # Values (BALANCED FONT SIZE - reduced from 16 to 13 for visual balance)
         values = [
-            Paragraph(f'<b><font size=16 color={self.accent_red}>{currency_symbol} {total_amount:,.2f}</font></b>', 
+            Paragraph(f'<b><font size=13 color={self.accent_red}>{currency_symbol} {total_amount:,.2f}</font></b>', 
                      ParagraphStyle('V1', parent=styles['Normal'], alignment=TA_CENTER)),
-            Paragraph(f'<b><font size=16 color={self.accent_green}>{currency_symbol} {total_paid:,.2f}</font></b>', 
+            Paragraph(f'<b><font size=13 color={self.accent_green}>{currency_symbol} {total_paid:,.2f}</font></b>', 
                      ParagraphStyle('V2', parent=styles['Normal'], alignment=TA_CENTER)),
-            Paragraph(f'<b><font size=16 color={self.accent_orange}>{currency_symbol} {balance_due:,.2f}</font></b>', 
+            Paragraph(f'<b><font size=13 color={self.accent_orange}>{currency_symbol} {balance_due:,.2f}</font></b>', 
                      ParagraphStyle('V3', parent=styles['Normal'], alignment=TA_CENTER)),
         ]
 
@@ -309,12 +310,12 @@ class ProfessionalInvoiceGenerator:
             ('BACKGROUND', (0, 1), (0, 1), self.accent_red_light),    # Red bg for Total
             ('BACKGROUND', (1, 1), (1, 1), self.accent_green_light),  # Green bg for Paid
             ('BACKGROUND', (2, 1), (2, 1), self.accent_orange_light), # Orange bg for Balance
-            ('TOPPADDING', (0, 1), (-1, 1), 12),
-            ('BOTTOMPADDING', (0, 1), (-1, 1), 12),
+            ('TOPPADDING', (0, 1), (-1, 1), 10),
+            ('BOTTOMPADDING', (0, 1), (-1, 1), 10),
         ]))
 
         story.append(summary_table)
-        story.append(Spacer(1, 6*mm))
+        story.append(Spacer(1, 4*mm))
 
     def _create_footer(self, story, styles, company_settings: Optional[Dict[str, Any]] = None):
         """Create professional footer."""
@@ -341,10 +342,10 @@ class ProfessionalInvoiceGenerator:
         doc = SimpleDocTemplate(
             filepath,
             pagesize=A4,
-            rightMargin=10*mm,
-            leftMargin=10*mm,
-            topMargin=10*mm,
-            bottomMargin=10*mm
+            rightMargin=12*mm,
+            leftMargin=12*mm,
+            topMargin=12*mm,
+            bottomMargin=12*mm
         )
         
         story = []
