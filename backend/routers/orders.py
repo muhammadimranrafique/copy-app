@@ -105,7 +105,7 @@ def create_order(
     session: Session = Depends(get_session),
     current_user: User = Depends(get_current_user)
 ):
-    """Create a new order."""
+    """Create a new order with optional initial payment."""
     try:
         # Convert frontend field names to backend field names
         order_dict = order_data.dict()
@@ -121,10 +121,37 @@ def create_order(
             order_dict['client_id'] = order_dict.pop('leaderId')
         if 'totalAmount' in order_dict:
             order_dict['total_amount'] = order_dict.pop('totalAmount')
+        
+        # Validate initial payment
+        initial_payment = float(initial_payment) if initial_payment else 0.0
+        total_amount = float(order_dict['total_amount'])
+        
+        if initial_payment < 0:
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail="Initial payment cannot be negative"
+            )
+        
+        if initial_payment > total_amount:
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail=f"Initial payment ({initial_payment:,.2f}) cannot exceed total amount ({total_amount:,.2f})"
+            )
             
         # Calculate balance
-        order_dict['paid_amount'] = float(initial_payment) if initial_payment else 0.0
-        order_dict['balance'] = float(order_dict['total_amount']) - order_dict['paid_amount']
+        order_dict['paid_amount'] = initial_payment
+        order_dict['balance'] = total_amount - initial_payment
+        
+        # Set order status based on payment amount
+        # Use the enum .value to ensure we get the string value, not the enum name
+        if order_dict['balance'] <= 0:
+            order_dict['status'] = OrderStatus.PAID.value
+        elif order_dict['paid_amount'] > 0:
+            order_dict['status'] = OrderStatus.PARTIALLY_PAID.value
+        else:
+            # Keep the status from the form if no payment, or default to PENDING
+            if 'status' not in order_dict or not order_dict['status']:
+                order_dict['status'] = OrderStatus.PENDING.value
         
         # Verify client exists
         client_statement = select(Client).where(Client.id == order_dict.get('client_id'))
@@ -142,7 +169,7 @@ def create_order(
         session.refresh(db_order)
         
         # Handle initial payment if provided
-        if initial_payment and float(initial_payment) > 0:
+        if initial_payment > 0:
             try:
                 # Parse payment date
                 from datetime import datetime
@@ -163,7 +190,7 @@ def create_order(
                 mode = mode_map.get(payment_mode, PaymentMode.CASH)
 
                 payment = Payment(
-                    amount=float(initial_payment),
+                    amount=initial_payment,
                     mode=mode,
                     status=PaymentStatus.COMPLETED,
                     client_id=db_order.client_id,
@@ -173,9 +200,16 @@ def create_order(
                 )
                 session.add(payment)
                 session.commit()
+                
+                print(f"Created initial payment of {initial_payment} for order {db_order.order_number}")
             except Exception as e:
                 print(f"Error creating initial payment: {e}")
-                # Don't fail the order creation if payment fails, but log it
+                session.rollback()
+                # Roll back the order creation if payment fails
+                raise HTTPException(
+                    status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+                    detail=f"Failed to create initial payment: {str(e)}"
+                )
                 
         return db_order
     except HTTPException:

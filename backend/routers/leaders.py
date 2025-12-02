@@ -14,10 +14,35 @@ def get_leaders(
     session: Session = Depends(get_session),
     current_user: User = Depends(get_current_user)
 ):
-    """Get all leaders (schools and dealers)."""
+    """Get all leaders (schools and dealers) with summary statistics."""
     statement = select(Client).offset(skip).limit(limit)
     leaders = session.exec(statement).all()
-    return leaders
+    
+    # Enhance each leader with summary statistics
+    enhanced_leaders = []
+    for leader in leaders:
+        leader_dict = leader.model_dump()
+        
+        # Get all orders for this leader
+        orders = session.exec(select(Order).where(Order.client_id == leader.id)).all()
+        
+        # Get all payments for this leader
+        payments = session.exec(select(Payment).where(Payment.client_id == leader.id)).all()
+        
+        # Calculate summary statistics
+        total_orders = sum(float(order.total_amount) for order in orders)
+        total_paid = sum(float(payment.amount) for payment in payments)
+        outstanding_balance = total_orders - total_paid + (leader.opening_balance or 0)
+        
+        # Add summary to leader data
+        leader_dict['total_orders'] = len(orders)
+        leader_dict['total_order_amount'] = total_orders
+        leader_dict['total_paid'] = total_paid
+        leader_dict['outstanding_balance'] = outstanding_balance
+        
+        enhanced_leaders.append(ClientRead(**leader_dict))
+    
+    return enhanced_leaders
 
 @router.get("/{leader_id}", response_model=ClientRead)
 def get_leader(leader_id: str, session: Session = Depends(get_session), current_user: User = Depends(get_current_user)):
@@ -106,66 +131,73 @@ def get_leader_ledger(
     session: Session = Depends(get_session),
     current_user: User = Depends(get_current_user)
 ):
-    """Get ledger for a specific leader."""
-    # Fetch the client to get opening balance
+    """Get comprehensive ledger for a specific leader with orders, payments, and balances."""
+    # Fetch the client
     client = session.exec(select(Client).where(Client.id == leader_id)).first()
     if not client:
         raise HTTPException(status_code=404, detail="Leader not found")
     
-    # Fetch orders
-    orders = session.exec(select(Order).where(Order.client_id == leader_id)).all()
+    # Fetch all orders for this client
+    orders = session.exec(
+        select(Order).where(Order.client_id == leader_id).order_by(Order.order_date.desc())
+    ).all()
     
-    # Fetch payments
-    payments = session.exec(select(Payment).where(Payment.client_id == leader_id)).all()
+    # Fetch all payments for this client
+    all_payments = session.exec(
+        select(Payment).where(Payment.client_id == leader_id).order_by(Payment.payment_date.desc())
+    ).all()
     
-    ledger_entries = []
+    # Calculate summary statistics
+    total_order_amount = sum(float(order.total_amount) for order in orders)
+    total_paid = sum(float(payment.amount) for payment in all_payments)
+    total_outstanding = total_order_amount - total_paid + (client.opening_balance or 0)
     
-    # Add opening balance as the first entry if it exists
-    if client.opening_balance != 0:
-        ledger_entries.append({
-            "id": "opening_balance",
-            "date": client.created_at,
-            "type": "OPENING",
-            "description": "Opening Balance",
-            "debit": client.opening_balance if client.opening_balance > 0 else 0,
-            "credit": abs(client.opening_balance) if client.opening_balance < 0 else 0,
-            "reference": "Opening"
-        })
-    
+    # Build orders list with payment details
+    orders_list = []
     for order in orders:
-        ledger_entries.append({
+        # Get payments for this specific order
+        order_payments = session.exec(
+            select(Payment).where(Payment.order_id == order.id).order_by(Payment.payment_date)
+        ).all()
+        
+        payments_list = []
+        for payment in order_payments:
+            payments_list.append({
+                "id": str(payment.id),
+                "payment_date": payment.payment_date.isoformat() if payment.payment_date else None,
+                "amount": float(payment.amount),
+                "mode": payment.mode.value if hasattr(payment.mode, 'value') else str(payment.mode),
+                "reference_number": payment.reference_number or ""
+            })
+        
+        orders_list.append({
             "id": str(order.id),
-            "date": order.order_date,
-            "type": "ORDER",
-            "description": f"Order #{order.order_number}",
-            "debit": order.total_amount,
-            "credit": 0,
-            "reference": order.order_number
+            "order_number": order.order_number,
+            "order_date": order.order_date.isoformat() if order.order_date else None,
+            "total_amount": float(order.total_amount),
+            "paid_amount": float(order.paid_amount),
+            "balance": float(order.balance),
+            "status": order.status.value if hasattr(order.status, 'value') else str(order.status),
+            "payments": payments_list
         })
-        
-    for payment in payments:
-        ledger_entries.append({
-            "id": str(payment.id),
-            "date": payment.payment_date,
-            "type": "PAYMENT",
-            "description": f"Payment ({payment.mode})",
-            "debit": 0,
-            "credit": payment.amount,
-            "reference": payment.reference_number
-        })
-        
-    # Sort by date
-    ledger_entries.sort(key=lambda x: x['date'])
     
-    # Calculate running balance starting with opening balance
-    balance = client.opening_balance
-    for entry in ledger_entries:
-        # Skip adding opening balance to itself
-        if entry['type'] != 'OPENING':
-            balance += entry['debit'] - entry['credit']
-        entry['balance'] = balance
-        
-    return ledger_entries
+    return {
+        "client": {
+            "id": str(client.id),
+            "name": client.name,
+            "type": client.type.value if hasattr(client.type, 'value') else str(client.type),
+            "contact": client.contact,
+            "address": client.address,
+            "opening_balance": float(client.opening_balance or 0)
+        },
+        "summary": {
+            "total_orders": len(orders),
+            "total_order_amount": total_order_amount,
+            "total_paid": total_paid,
+            "total_outstanding": total_outstanding
+        },
+        "orders": orders_list
+    }
 
 @router.get("/{leader_id}/payments")
 def get_leader_payments(
