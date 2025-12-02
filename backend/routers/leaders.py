@@ -166,3 +166,182 @@ def get_leader_ledger(
         entry['balance'] = balance
         
     return ledger_entries
+
+@router.get("/{leader_id}/payments")
+def get_leader_payments(
+    leader_id: str,
+    session: Session = Depends(get_session),
+    current_user: User = Depends(get_current_user)
+):
+    """Get all payments for a specific leader with order details."""
+    # Verify leader exists
+    client = session.exec(select(Client).where(Client.id == leader_id)).first()
+    if not client:
+        raise HTTPException(status_code=404, detail="Leader not found")
+    
+    # Fetch payments with order information
+    payments_query = session.exec(
+        select(Payment).where(Payment.client_id == leader_id).order_by(Payment.payment_date.desc())
+    ).all()
+    
+    payments = []
+    for payment in payments_query:
+        # Get associated order if exists
+        order = None
+        if payment.order_id:
+            order = session.exec(select(Order).where(Order.id == payment.order_id)).first()
+        
+        payments.append({
+            "id": str(payment.id),
+            "payment_date": payment.payment_date.isoformat() if payment.payment_date else None,
+            "amount": float(payment.amount),
+            "mode": payment.mode.value if hasattr(payment.mode, 'value') else str(payment.mode),
+            "status": payment.status.value if hasattr(payment.status, 'value') else str(payment.status),
+            "reference_number": payment.reference_number or "N/A",
+            "order_number": order.order_number if order else "N/A",
+            "order_id": str(order.id) if order else None
+        })
+    
+    return payments
+
+@router.get("/{leader_id}/summary")
+def get_leader_summary(
+    leader_id: str,
+    session: Session = Depends(get_session),
+    current_user: User = Depends(get_current_user)
+):
+    """Get summary statistics for a leader."""
+    client = session.exec(select(Client).where(Client.id == leader_id)).first()
+    if not client:
+        raise HTTPException(status_code=404, detail="Leader not found")
+    
+    # Get all orders
+    orders = session.exec(select(Order).where(Order.client_id == leader_id)).all()
+    
+    # Get all payments
+    payments = session.exec(select(Payment).where(Payment.client_id == leader_id)).all()
+    
+    total_orders = sum(float(order.total_amount) for order in orders)
+    total_paid = sum(float(payment.amount) for payment in payments)
+    outstanding_balance = total_orders - total_paid + (client.opening_balance or 0)
+    
+    return {
+        "total_orders": total_orders,
+        "total_paid": total_paid,
+        "outstanding_balance": outstanding_balance,
+        "opening_balance": client.opening_balance or 0,
+        "order_count": len(orders),
+        "payment_count": len(payments)
+    }
+
+@router.get("/{leader_id}/orders")
+def get_leader_orders(
+    leader_id: str,
+    session: Session = Depends(get_session),
+    current_user: User = Depends(get_current_user)
+):
+    """Get all orders for a specific leader."""
+    # Verify leader exists
+    client = session.exec(select(Client).where(Client.id == leader_id)).first()
+    if not client:
+        raise HTTPException(status_code=404, detail="Leader not found")
+    
+    # Fetch orders
+    orders = session.exec(
+        select(Order).where(Order.client_id == leader_id).order_by(Order.order_date.desc())
+    ).all()
+    
+    orders_list = []
+    for order in orders:
+        orders_list.append({
+            "id": str(order.id),
+            "order_number": order.order_number,
+            "order_date": order.order_date.isoformat() if order.order_date else None,
+            "total_amount": float(order.total_amount),
+            "paid_amount": float(order.paid_amount),
+            "balance": float(order.balance),
+            "status": order.status
+        })
+    
+    return orders_list
+
+@router.get("/{leader_id}/payments/export")
+def export_leader_payments(
+    leader_id: str,
+    session: Session = Depends(get_session),
+    current_user: User = Depends(get_current_user)
+):
+    """Export payment history for a leader as CSV."""
+    from fastapi.responses import StreamingResponse
+    import io
+    import csv
+    from datetime import datetime
+    
+    # Verify leader exists
+    client = session.exec(select(Client).where(Client.id == leader_id)).first()
+    if not client:
+        raise HTTPException(status_code=404, detail="Leader not found")
+    
+    # Fetch payments with order information
+    payments_query = session.exec(
+        select(Payment).where(Payment.client_id == leader_id).order_by(Payment.payment_date.desc())
+    ).all()
+    
+    # Create CSV in memory
+    output = io.StringIO()
+    writer = csv.writer(output)
+    
+    # Write headers
+    writer.writerow([
+        'Client Name',
+        'Client Type',
+        'Payment Date',
+        'Order Number',
+        'Payment Amount',
+        'Payment Method',
+        'Reference Number',
+        'Order Total',
+        'Total Paid to Date',
+        'Remaining Balance',
+        'Payment Status'
+    ])
+    
+    # Calculate running totals
+    total_paid = 0
+    
+    for payment in reversed(list(payments_query)):  # Reverse to calculate chronologically
+        # Get associated order if exists
+        order = None
+        if payment.order_id:
+            order = session.exec(select(Order).where(Order.id == payment.order_id)).first()
+        
+        total_paid += float(payment.amount)
+        
+        # Calculate remaining balance
+        order_total = float(order.total_amount) if order else 0
+        remaining_balance = order_total - total_paid if order else 0
+        
+        writer.writerow([
+            client.name,
+            client.type,
+            payment.payment_date.strftime('%Y-%m-%d %H:%M:%S') if payment.payment_date else 'N/A',
+            order.order_number if order else 'N/A',
+            f"{float(payment.amount):.2f}",
+            payment.mode.value if hasattr(payment.mode, 'value') else str(payment.mode),
+            payment.reference_number or 'N/A',
+            f"{order_total:.2f}" if order else 'N/A',
+            f"{total_paid:.2f}",
+            f"{remaining_balance:.2f}" if order else 'N/A',
+            payment.status.value if hasattr(payment.status, 'value') else str(payment.status)
+        ])
+    
+    # Prepare response
+    output.seek(0)
+    filename = f"{client.name.replace(' ', '_')}_Payment_History_{datetime.now().strftime('%Y%m%d')}.csv"
+    
+    return StreamingResponse(
+        iter([output.getvalue()]),
+        media_type="text/csv",
+        headers={"Content-Disposition": f"attachment; filename={filename}"}
+    )
+

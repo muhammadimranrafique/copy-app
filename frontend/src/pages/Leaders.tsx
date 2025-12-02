@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { Plus, Search } from 'lucide-react';
+import { Plus, Search, Download } from 'lucide-react';
 import { useCurrency } from '@/hooks/useCurrency';
 import { useAuth } from '@/lib/useAuth';
 import { api } from '@/lib/api-client';
@@ -12,6 +12,7 @@ import { Label } from '@/components/ui/label';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { toast } from 'sonner';
 import { Badge } from '@/components/ui/badge';
+import { exportLeaderPayments } from '@/lib/export-utils';
 
 interface Leader {
   id: string;
@@ -27,6 +28,7 @@ export default function Leaders() {
   const { user, isLoading: authLoading } = useAuth();
   const [searchTerm, setSearchTerm] = useState('');
   const [dialogOpen, setDialogOpen] = useState(false);
+  const [exportingId, setExportingId] = useState<string | null>(null);
   const [formData, setFormData] = useState({
     name: '',
     type: 'School',
@@ -59,6 +61,18 @@ export default function Leaders() {
       loadLeaders();
     } catch (error) {
       toast.error('Failed to create leader');
+    }
+  };
+
+  const handleExport = async (leader: Leader, e: React.MouseEvent) => {
+    e.stopPropagation(); // Prevent card click if card is clickable
+    setExportingId(leader.id);
+    try {
+      await exportLeaderPayments(leader.id, leader.name);
+    } catch (error) {
+      // Error already handled in exportLeaderPayments
+    } finally {
+      setExportingId(null);
     }
   };
 
@@ -180,6 +194,27 @@ export default function Leaders() {
                   <p className={`font-semibold text-sm sm:text-base ${(leader.opening_balance || 0) >= 0 ? 'text-green-600' : 'text-red-600'}`}>
                     {formatCurrency(leader.opening_balance || 0)}
                   </p>
+                </div>
+                <div className="pt-2">
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    className="w-full"
+                    onClick={(e) => handleExport(leader, e)}
+                    disabled={exportingId === leader.id}
+                  >
+                    {exportingId === leader.id ? (
+                      <>
+                        <div className="w-4 h-4 mr-2 border-2 border-current border-t-transparent rounded-full animate-spin" />
+                        Exporting...
+                      </>
+                    ) : (
+                      <>
+                        <Download className="w-4 h-4 mr-2" />
+                        Export Payment History
+                      </>
+                    )}
+                  </Button>
                 </div>
               </CardContent>
             </Card>
