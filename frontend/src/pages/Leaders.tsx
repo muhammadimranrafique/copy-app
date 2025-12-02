@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { Plus, Search, Download } from 'lucide-react';
+import { Plus, Search, Download, Eye } from 'lucide-react';
 import { useCurrency } from '@/hooks/useCurrency';
 import { useAuth } from '@/lib/useAuth';
 import { api } from '@/lib/api-client';
@@ -13,6 +13,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { toast } from 'sonner';
 import { Badge } from '@/components/ui/badge';
 import { exportLeaderPayments } from '@/lib/export-utils';
+import { ClientLedgerModal } from '@/components/ClientLedgerModal';
 
 interface Leader {
   id: string;
@@ -21,6 +22,10 @@ interface Leader {
   contact: string;
   address: string;
   opening_balance: number;
+  total_orders?: number;
+  total_order_amount?: number;
+  total_paid?: number;
+  outstanding_balance?: number;
 }
 
 export default function Leaders() {
@@ -29,6 +34,8 @@ export default function Leaders() {
   const [searchTerm, setSearchTerm] = useState('');
   const [dialogOpen, setDialogOpen] = useState(false);
   const [exportingId, setExportingId] = useState<string | null>(null);
+  const [selectedLeader, setSelectedLeader] = useState<Leader | null>(null);
+  const [ledgerModalOpen, setLedgerModalOpen] = useState(false);
   const [formData, setFormData] = useState({
     name: '',
     type: 'School',
@@ -65,7 +72,7 @@ export default function Leaders() {
   };
 
   const handleExport = async (leader: Leader, e: React.MouseEvent) => {
-    e.stopPropagation(); // Prevent card click if card is clickable
+    e.stopPropagation();
     setExportingId(leader.id);
     try {
       await exportLeaderPayments(leader.id, leader.name);
@@ -74,6 +81,12 @@ export default function Leaders() {
     } finally {
       setExportingId(null);
     }
+  };
+
+  const handleViewLedger = (leader: Leader, e: React.MouseEvent) => {
+    e.stopPropagation();
+    setSelectedLeader(leader);
+    setLedgerModalOpen(true);
   };
 
   const filteredLeaders = leaders.filter(leader =>
@@ -165,13 +178,13 @@ export default function Leaders() {
       {loading ? (
         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3 sm:gap-4">
           {[1, 2, 3].map((i) => (
-            <div key={i} className="h-48 bg-muted rounded-lg animate-pulse"></div>
+            <div key={i} className="h-64 bg-muted rounded-lg animate-pulse"></div>
           ))}
         </div>
       ) : (
         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3 sm:gap-4">
           {filteredLeaders.map((leader) => (
-            <Card key={leader.id} className="card-hover">
+            <Card key={leader.id} className="card-hover cursor-pointer" onClick={(e) => handleViewLedger(leader, e)}>
               <CardHeader className="pb-3">
                 <div className="flex items-start justify-between gap-2">
                   <CardTitle className="text-base sm:text-lg flex-1 min-w-0 break-words">{leader.name}</CardTitle>
@@ -180,7 +193,7 @@ export default function Leaders() {
                   </Badge>
                 </div>
               </CardHeader>
-              <CardContent className="space-y-2 pt-3">
+              <CardContent className="space-y-3 pt-3">
                 <div>
                   <p className="text-xs sm:text-sm text-muted-foreground">Contact</p>
                   <p className="font-medium text-sm sm:text-base break-words">{leader.contact || 'N/A'}</p>
@@ -189,29 +202,57 @@ export default function Leaders() {
                   <p className="text-xs sm:text-sm text-muted-foreground">Address</p>
                   <p className="font-medium text-sm sm:text-base break-words">{leader.address || 'N/A'}</p>
                 </div>
-                <div>
-                  <p className="text-xs sm:text-sm text-muted-foreground">Balance</p>
-                  <p className={`font-semibold text-sm sm:text-base ${(leader.opening_balance || 0) >= 0 ? 'text-green-600' : 'text-red-600'}`}>
-                    {formatCurrency(leader.opening_balance || 0)}
-                  </p>
+
+                {/* Financial Summary */}
+                <div className="border-t pt-3 space-y-2">
+                  <div className="grid grid-cols-2 gap-2">
+                    <div>
+                      <p className="text-xs text-muted-foreground">Total Orders</p>
+                      <p className="font-semibold text-sm">{leader.total_orders || 0}</p>
+                    </div>
+                    <div>
+                      <p className="text-xs text-muted-foreground">Total Paid</p>
+                      <p className="font-semibold text-sm text-green-600">
+                        {formatCurrency(leader.total_paid || 0)}
+                      </p>
+                    </div>
+                  </div>
+                  <div>
+                    <p className="text-xs text-muted-foreground">Outstanding Balance</p>
+                    <p className={`text-lg font-bold ${(leader.outstanding_balance || 0) > 0 ? 'text-red-600' : 'text-green-600'
+                      }`}>
+                      {formatCurrency(leader.outstanding_balance || 0)}
+                    </p>
+                  </div>
                 </div>
-                <div className="pt-2">
+
+                {/* Action Buttons */}
+                <div className="flex gap-2 pt-2">
                   <Button
                     variant="outline"
                     size="sm"
-                    className="w-full"
+                    className="flex-1"
+                    onClick={(e) => handleViewLedger(leader, e)}
+                  >
+                    <Eye className="w-4 h-4 mr-1" />
+                    View Ledger
+                  </Button>
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    className="flex-1"
                     onClick={(e) => handleExport(leader, e)}
                     disabled={exportingId === leader.id}
                   >
                     {exportingId === leader.id ? (
                       <>
-                        <div className="w-4 h-4 mr-2 border-2 border-current border-t-transparent rounded-full animate-spin" />
+                        <div className="w-4 h-4 mr-1 border-2 border-current border-t-transparent rounded-full animate-spin" />
                         Exporting...
                       </>
                     ) : (
                       <>
-                        <Download className="w-4 h-4 mr-2" />
-                        Export Payment History
+                        <Download className="w-4 h-4 mr-1" />
+                        Export
                       </>
                     )}
                   </Button>
@@ -226,6 +267,16 @@ export default function Leaders() {
         <div className="text-center py-12">
           <p className="text-muted-foreground">No leaders found</p>
         </div>
+      )}
+
+      {/* Client Ledger Modal */}
+      {selectedLeader && (
+        <ClientLedgerModal
+          clientId={selectedLeader.id}
+          clientName={selectedLeader.name}
+          open={ledgerModalOpen}
+          onOpenChange={setLedgerModalOpen}
+        />
       )}
     </div>
   );

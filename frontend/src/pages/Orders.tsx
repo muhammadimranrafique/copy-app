@@ -89,6 +89,18 @@ export default function Orders() {
       toast.error('Total amount must be greater than 0');
       return;
     }
+
+    // Validate initial payment
+    if (formData.initialPayment < 0) {
+      toast.error('Initial payment cannot be negative');
+      return;
+    }
+
+    if (formData.initialPayment > formData.totalAmount) {
+      toast.error(`Initial payment (${formatCurrency(formData.initialPayment)}) cannot exceed total amount (${formatCurrency(formData.totalAmount)})`);
+      return;
+    }
+
     try {
       await createOrder(formData);
       toast.success('Order created successfully');
@@ -213,6 +225,61 @@ export default function Orders() {
                       placeholder="0.00"
                     />
                   </div>
+
+                  {/* Remaining Balance Display */}
+                  {formData.totalAmount > 0 && (
+                    <div className={`p-4 rounded-lg border-2 ${formData.initialPayment >= formData.totalAmount
+                        ? 'bg-green-50 border-green-300'
+                        : formData.initialPayment > 0
+                          ? 'bg-orange-50 border-orange-300'
+                          : 'bg-blue-50 border-blue-300'
+                      }`}>
+                      <div className="space-y-2">
+                        <div className="flex justify-between text-sm">
+                          <span className="text-muted-foreground">Total Amount:</span>
+                          <span className="font-semibold">{formatCurrency(formData.totalAmount)}</span>
+                        </div>
+                        <div className="flex justify-between text-sm">
+                          <span className="text-muted-foreground">Initial Payment:</span>
+                          <span className="font-semibold text-green-600">
+                            {formatCurrency(formData.initialPayment)}
+                          </span>
+                        </div>
+                        <div className="border-t pt-2">
+                          <div className="flex justify-between">
+                            <span className="font-medium">Remaining Balance:</span>
+                            <span className={`text-xl font-bold ${formData.initialPayment >= formData.totalAmount
+                                ? 'text-green-600'
+                                : formData.initialPayment > 0
+                                  ? 'text-orange-600'
+                                  : 'text-blue-600'
+                              }`}>
+                              {formatCurrency(formData.totalAmount - formData.initialPayment)}
+                            </span>
+                          </div>
+                          {/* Progress Bar */}
+                          <div className="mt-2 w-full bg-gray-200 rounded-full h-2">
+                            <div
+                              className={`h-2 rounded-full transition-all ${formData.initialPayment >= formData.totalAmount
+                                  ? 'bg-green-600'
+                                  : 'bg-orange-500'
+                                }`}
+                              style={{
+                                width: `${Math.min((formData.initialPayment / formData.totalAmount) * 100, 100)}%`
+                              }}
+                            />
+                          </div>
+                          <p className="text-xs text-muted-foreground mt-1 text-center">
+                            {formData.initialPayment >= formData.totalAmount
+                              ? '✓ Fully Paid'
+                              : formData.initialPayment > 0
+                                ? `${((formData.initialPayment / formData.totalAmount) * 100).toFixed(1)}% Paid`
+                                : 'No payment yet'}
+                          </p>
+                        </div>
+                      </div>
+                    </div>
+                  )}
 
                   {formData.initialPayment > 0 && (
                     <>

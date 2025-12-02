@@ -59,6 +59,11 @@ class ClientCreate(ClientBase):
 class ClientRead(ClientBase):
     id: UUID
     created_at: datetime
+    # Optional summary statistics (populated by specific endpoints)
+    total_orders: Optional[int] = None
+    total_order_amount: Optional[float] = None
+    total_paid: Optional[float] = None
+    outstanding_balance: Optional[float] = None
 
 # Product Models
 class ProductBase(SQLModel):
