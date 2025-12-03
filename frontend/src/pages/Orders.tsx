@@ -1,5 +1,6 @@
 import { useState } from 'react';
-import { Plus, ShoppingCart } from 'lucide-react';
+import { Plus, ShoppingCart, Receipt, DollarSign, Eye, Download } from 'lucide-react';
+import { PaymentHistory } from '@/components/PaymentHistory';
 import { useCurrency } from '@/hooks/useCurrency';
 import { useAuth } from '@/lib/useAuth';
 import { getOrders, createOrder, getLeaders } from '@/lib/mock-api';
@@ -35,6 +36,8 @@ export default function Orders() {
   const { formatCurrency } = useCurrency();
   const { user, isLoading: authLoading } = useAuth();
   const [dialogOpen, setDialogOpen] = useState(false);
+  const [selectedOrderId, setSelectedOrderId] = useState<string | null>(null);
+  const [paymentHistoryOpen, setPaymentHistoryOpen] = useState(false);
   const [formData, setFormData] = useState({
     orderNumber: '',
     leaderId: '',
@@ -125,10 +128,49 @@ export default function Orders() {
   const getStatusColor = (status?: string) => {
     switch (status) {
       case 'Paid': return 'default';
+      case 'Partially Paid': return 'secondary';
       case 'Delivered': return 'default';
       case 'In Production': return 'secondary';
       default: return 'outline';
     }
+  };
+
+  const handleDownloadInvoice = async (orderId: string) => {
+    try {
+      toast.loading('Generating invoice...', { id: 'download-invoice' });
+      const token = localStorage.getItem('access_token');
+      const response = await fetch(
+        `${import.meta.env.VITE_API_BASE_URL || 'http://127.0.0.1:8000/api/v1'}/orders/${orderId}/invoice`,
+        {
+          method: 'POST',
+          headers: {
+            'Authorization': `Bearer ${token}`
+          }
+        }
+      );
+
+      if (!response.ok) throw new Error('Failed to generate invoice');
+
+      const blob = await response.blob();
+      const url = window.URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = `invoice-${orderId}.pdf`;
+      document.body.appendChild(a);
+      a.click();
+      document.body.removeChild(a);
+      window.URL.revokeObjectURL(url);
+
+      toast.success('Invoice downloaded successfully', { id: 'download-invoice' });
+    } catch (error) {
+      console.error('Error downloading invoice:', error);
+      toast.error('Failed to download invoice', { id: 'download-invoice' });
+    }
+  };
+
+  const handleViewPaymentHistory = (orderId: string) => {
+    setSelectedOrderId(orderId);
+    setPaymentHistoryOpen(true);
   };
 
   return (
@@ -229,10 +271,10 @@ export default function Orders() {
                   {/* Remaining Balance Display */}
                   {formData.totalAmount > 0 && (
                     <div className={`p-4 rounded-lg border-2 ${formData.initialPayment >= formData.totalAmount
-                        ? 'bg-green-50 border-green-300'
-                        : formData.initialPayment > 0
-                          ? 'bg-orange-50 border-orange-300'
-                          : 'bg-blue-50 border-blue-300'
+                      ? 'bg-green-50 border-green-300'
+                      : formData.initialPayment > 0
+                        ? 'bg-orange-50 border-orange-300'
+                        : 'bg-blue-50 border-blue-300'
                       }`}>
                       <div className="space-y-2">
                         <div className="flex justify-between text-sm">
@@ -249,10 +291,10 @@ export default function Orders() {
                           <div className="flex justify-between">
                             <span className="font-medium">Remaining Balance:</span>
                             <span className={`text-xl font-bold ${formData.initialPayment >= formData.totalAmount
-                                ? 'text-green-600'
-                                : formData.initialPayment > 0
-                                  ? 'text-orange-600'
-                                  : 'text-blue-600'
+                              ? 'text-green-600'
+                              : formData.initialPayment > 0
+                                ? 'text-orange-600'
+                                : 'text-blue-600'
                               }`}>
                               {formatCurrency(formData.totalAmount - formData.initialPayment)}
                             </span>
@@ -261,8 +303,8 @@ export default function Orders() {
                           <div className="mt-2 w-full bg-gray-200 rounded-full h-2">
                             <div
                               className={`h-2 rounded-full transition-all ${formData.initialPayment >= formData.totalAmount
-                                  ? 'bg-green-600'
-                                  : 'bg-orange-500'
+                                ? 'bg-green-600'
+                                : 'bg-orange-500'
                                 }`}
                               style={{
                                 width: `${Math.min((formData.initialPayment / formData.totalAmount) * 100, 100)}%`
@@ -327,29 +369,98 @@ export default function Orders() {
           {orders.map((order) => (
             <Card key={order.id} className="card-hover">
               <CardContent className="p-4 sm:p-6">
-                <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
-                  <div className="flex items-start gap-3 sm:gap-4 flex-1">
-                    <div className="p-2 sm:p-3 rounded-full bg-primary/10 flex-shrink-0">
-                      <ShoppingCart className="w-5 h-5 sm:w-6 sm:h-6 text-primary" />
+                <div className="flex flex-col gap-4">
+                  {/* Header Section */}
+                  <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+                    <div className="flex items-start gap-3 sm:gap-4 flex-1">
+                      <div className="p-2 sm:p-3 rounded-full bg-primary/10 flex-shrink-0">
+                        <ShoppingCart className="w-5 h-5 sm:w-6 sm:h-6 text-primary" />
+                      </div>
+                      <div className="flex-1 min-w-0">
+                        <h3 className="font-semibold text-base sm:text-lg truncate">{order.orderNumber !== 'N/A' ? `Order #${order.orderNumber}` : order.orderNumber}</h3>
+                        <p className="text-xs sm:text-sm text-muted-foreground">
+                          {order.orderDate ? format(new Date(order.orderDate), 'MMM dd, yyyy') : 'N/A'}
+                        </p>
+                        <p className="text-xs sm:text-sm text-muted-foreground mt-1 truncate">
+                          Leader: {order.leaderName || 'N/A'}
+                        </p>
+                      </div>
                     </div>
-                    <div className="flex-1 min-w-0">
-                      <h3 className="font-semibold text-base sm:text-lg truncate">{order.orderNumber !== 'N/A' ? `Order #${order.orderNumber}` : order.orderNumber}</h3>
-                      <p className="text-xs sm:text-sm text-muted-foreground">
-                        {order.orderDate ? format(new Date(order.orderDate), 'MMM dd, yyyy') : 'N/A'}
-                      </p>
-                      <p className="text-xs sm:text-sm text-muted-foreground mt-1 truncate">
-                        Leader: {order.leaderName || 'N/A'}
-                      </p>
-                    </div>
-                  </div>
-                  <div className="flex items-center justify-between sm:justify-end gap-3 sm:gap-4 w-full sm:w-auto">
-                    <div className="text-left sm:text-right">
-                      <p className="text-xs sm:text-sm text-muted-foreground">Amount</p>
-                      <p className="text-lg sm:text-xl font-bold">{formatCurrency(order.totalAmount)}</p>
-                    </div>
-                    <Badge variant={getStatusColor(order.status)} className="text-xs flex-shrink-0">
+                    <Badge variant={getStatusColor(order.status)} className="text-xs flex-shrink-0 self-start sm:self-center">
                       {order.status || 'Pending'}
                     </Badge>
+                  </div>
+
+                  {/* Payment Details Section */}
+                  <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 p-3 bg-gray-50 rounded-lg border">
+                    <div>
+                      <p className="text-xs text-muted-foreground">Total Amount</p>
+                      <p className="text-sm font-semibold">{formatCurrency(order.totalAmount)}</p>
+                    </div>
+                    <div>
+                      <p className="text-xs text-muted-foreground">Paid</p>
+                      <p className="text-sm font-semibold text-green-600">
+                        {formatCurrency(order.paidAmount || 0)}
+                      </p>
+                    </div>
+                    <div>
+                      <p className="text-xs text-muted-foreground">Balance</p>
+                      <p className="text-sm font-semibold text-orange-600">
+                        {formatCurrency(order.balance || order.totalAmount)}
+                      </p>
+                    </div>
+                    <div>
+                      <p className="text-xs text-muted-foreground">Progress</p>
+                      <div className="flex items-center gap-2">
+                        <div className="flex-1 bg-gray-200 rounded-full h-2">
+                          <div
+                            className="bg-green-600 h-2 rounded-full transition-all"
+                            style={{
+                              width: `${Math.min(((order.paidAmount || 0) / order.totalAmount) * 100, 100)}%`
+                            }}
+                          />
+                        </div>
+                        <span className="text-xs font-medium">
+                          {Math.round(((order.paidAmount || 0) / order.totalAmount) * 100)}%
+                        </span>
+                      </div>
+                    </div>
+                  </div>
+
+                  {/* Action Buttons */}
+                  <div className="flex flex-wrap gap-2">
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      onClick={() => handleViewPaymentHistory(order.id)}
+                      className="flex items-center gap-1"
+                    >
+                      <Eye className="w-3 h-3" />
+                      <span className="hidden sm:inline">View</span> Payments
+                    </Button>
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      onClick={() => handleDownloadInvoice(order.id)}
+                      className="flex items-center gap-1"
+                    >
+                      <Download className="w-3 h-3" />
+                      <span className="hidden sm:inline">Download</span> Invoice
+                    </Button>
+                    {(order.status === 'Pending' || order.status === 'Partially Paid') && order.balance > 0 && (
+                      <Button
+                        variant="default"
+                        size="sm"
+                        onClick={() => {
+                          // Navigate to payments page with this order pre-selected
+                          window.location.href = `/payments?orderId=${order.id}&leaderId=${order.leaderId}`;
+                        }}
+                        className="flex items-center gap-1 ml-auto"
+                      >
+                        <DollarSign className="w-3 h-3" />
+                        Record Payment
+                      </Button>
+                    )}
                   </div>
                 </div>
               </CardContent>
@@ -364,6 +475,27 @@ export default function Orders() {
           <p className="text-muted-foreground">No orders found</p>
         </div>
       )}
+
+      {/* Payment History Dialog */}
+      <Dialog open={paymentHistoryOpen} onOpenChange={setPaymentHistoryOpen}>
+        <DialogContent className="max-w-[95vw] sm:max-w-3xl max-h-[90vh] overflow-y-auto">
+          <DialogHeader>
+            <DialogTitle>Payment History</DialogTitle>
+          </DialogHeader>
+          {selectedOrderId && (() => {
+            const selectedOrder = orders.find(o => o.id === selectedOrderId);
+            if (!selectedOrder) return null;
+
+            return (
+              <PaymentHistory
+                orderId={selectedOrderId}
+                orderTotal={selectedOrder.totalAmount}
+                currentBalance={selectedOrder.balance || selectedOrder.totalAmount}
+              />
+            );
+          })()}
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }
