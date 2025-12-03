@@ -190,7 +190,7 @@ export default function Payments() {
             <form onSubmit={handleSubmit} className="space-y-4">
               <div>
                 <Label htmlFor="leader">Leader *</Label>
-                <Select value={formData.leaderId} onValueChange={(value) => setFormData({ ...formData, leaderId: value })}>
+                <Select value={formData.leaderId} onValueChange={(value) => setFormData({ ...formData, leaderId: value, orderId: '' })}>
                   <SelectTrigger>
                     <SelectValue placeholder="Select a leader" />
                   </SelectTrigger>
@@ -203,6 +203,81 @@ export default function Payments() {
                   </SelectContent>
                 </Select>
               </div>
+
+              {/* Order Selection - Only show if leader is selected */}
+              {formData.leaderId && (
+                <div>
+                  <Label htmlFor="order">Order (Optional)</Label>
+                  <Select value={formData.orderId} onValueChange={(value) => setFormData({ ...formData, orderId: value })}>
+                    <SelectTrigger>
+                      <SelectValue placeholder="Select an order or leave blank for general payment" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="">No specific order (General Payment)</SelectItem>
+                      {leaderOrders
+                        .filter((order: any) => order.status !== 'Paid' && order.balance > 0)
+                        .map((order: any) => (
+                          <SelectItem key={order.id} value={order.id}>
+                            {order.orderNumber} - Rs {order.totalAmount?.toLocaleString()}
+                            (Balance: Rs {order.balance?.toLocaleString()})
+                          </SelectItem>
+                        ))}
+                    </SelectContent>
+                  </Select>
+                  {leaderOrders.length === 0 && (
+                    <p className="text-xs text-muted-foreground mt-1">No unpaid orders found for this leader</p>
+                  )}
+                </div>
+              )}
+
+              {/* Remaining Balance Display */}
+              {formData.orderId && leaderOrders.length > 0 && (() => {
+                const selectedOrder = leaderOrders.find((o: any) => o.id === formData.orderId);
+                if (!selectedOrder) return null;
+
+                const remainingBalance = selectedOrder.balance || 0;
+                const willExceed = formData.amount > remainingBalance;
+
+                return (
+                  <div className="bg-blue-50 border border-blue-200 rounded-lg p-4 space-y-2">
+                    <div className="flex items-center justify-between">
+                      <span className="text-sm font-medium text-blue-900">Order Details</span>
+                      <Badge variant="outline" className="bg-white">
+                        {selectedOrder.orderNumber}
+                      </Badge>
+                    </div>
+                    <div className="grid grid-cols-2 gap-2 text-sm">
+                      <div>
+                        <p className="text-blue-600">Total Amount</p>
+                        <p className="font-semibold text-blue-900">Rs {selectedOrder.totalAmount?.toLocaleString()}</p>
+                      </div>
+                      <div>
+                        <p className="text-blue-600">Paid So Far</p>
+                        <p className="font-semibold text-blue-900">Rs {selectedOrder.paidAmount?.toLocaleString()}</p>
+                      </div>
+                    </div>
+                    <div className="pt-2 border-t border-blue-200">
+                      <p className="text-sm text-blue-600">Remaining Balance</p>
+                      <p className="text-2xl font-bold text-blue-900">Rs {remainingBalance.toLocaleString()}</p>
+                    </div>
+                    {willExceed && formData.amount > 0 && (
+                      <div className="bg-red-50 border border-red-200 rounded p-2 mt-2">
+                        <p className="text-xs text-red-700 font-medium">
+                          ⚠️ Payment amount exceeds remaining balance by Rs {(formData.amount - remainingBalance).toLocaleString()}
+                        </p>
+                      </div>
+                    )}
+                    {formData.amount > 0 && formData.amount <= remainingBalance && (
+                      <div className="bg-green-50 border border-green-200 rounded p-2 mt-2">
+                        <p className="text-xs text-green-700">
+                          ✓ New balance after payment: Rs {(remainingBalance - formData.amount).toLocaleString()}
+                        </p>
+                      </div>
+                    )}
+                  </div>
+                );
+              })()}
+
               <div>
                 <Label htmlFor="amount">Amount (Rs) *</Label>
                 <div className="relative">
