@@ -482,9 +482,24 @@ export default function Orders() {
           <DialogHeader>
             <DialogTitle>Payment History</DialogTitle>
           </DialogHeader>
-          {selectedOrderId && (() => {
+          {selectedOrderId ? (() => {
             const selectedOrder = orders.find(o => o.id === selectedOrderId);
-            if (!selectedOrder) return null;
+
+            if (!selectedOrder) {
+              console.error('[Orders] Selected order not found:', selectedOrderId);
+              return (
+                <div className="text-center py-8">
+                  <p className="text-muted-foreground">Order not found. Please try again.</p>
+                </div>
+              );
+            }
+
+            console.log('[Orders] Rendering PaymentHistory for order:', {
+              orderId: selectedOrderId,
+              orderNumber: selectedOrder.orderNumber,
+              totalAmount: selectedOrder.totalAmount,
+              balance: selectedOrder.balance
+            });
 
             return (
               <PaymentHistory
@@ -493,7 +508,11 @@ export default function Orders() {
                 currentBalance={selectedOrder.balance || selectedOrder.totalAmount}
               />
             );
-          })()}
+          })() : (
+            <div className="text-center py-8">
+              <p className="text-muted-foreground">No order selected</p>
+            </div>
+          )}
         </DialogContent>
       </Dialog>
     </div>

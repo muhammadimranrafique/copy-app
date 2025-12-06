@@ -13,7 +13,7 @@ import os
 
 router = APIRouter(prefix="/payments", tags=["Payments"])
 
-@router.get("/", response_model=List[PaymentRead])
+@router.get("/", response_model=List[PaymentRead], response_model_by_alias=True)
 def get_payments(
     skip: int = 0,
     limit: int = 100,
@@ -23,6 +23,8 @@ def get_payments(
 ):
     """Get all payments, optionally filtered by order ID."""
     try:
+        print(f"\n[Payments API] GET /payments/ called with orderId={orderId}, skip={skip}, limit={limit}")
+        
         # Build base query
         statement = (
             select(Payment, Client)
@@ -34,9 +36,9 @@ def get_payments(
             try:
                 order_uuid = UUID(orderId)
                 statement = statement.where(Payment.order_id == order_uuid)
-                print(f"Filtering payments by order_id: {order_uuid}")
+                print(f"[Payments API] Filtering payments by order_id: {order_uuid}")
             except ValueError:
-                print(f"Invalid orderId format: {orderId}")
+                print(f"[Payments API] ERROR: Invalid orderId format: {orderId}")
                 raise HTTPException(
                     status_code=status.HTTP_400_BAD_REQUEST,
                     detail=f"Invalid order ID format: {orderId}"
@@ -48,51 +50,109 @@ def get_payments(
         results = session.exec(statement).all()
         payments = []
 
+        print(f"[Payments API] Found {len(results)} payment records from database")
+
         for payment, client in results:
-            payment_dict = payment.model_dump()
-            # Add complete client data
+            # Build client info object
+            client_info = None
             if client:
-                payment_dict["client"] = {
+                client_info = {
                     "id": client.id,
                     "name": client.name,
                     "type": client.type.value if hasattr(client.type, 'value') else str(client.type),
                     "contact": client.contact,
                     "address": client.address
                 }
-            else:
-                payment_dict["client"] = None
-            # Convert enum values to strings
-            payment_dict["status"] = payment.status.value if hasattr(payment.status, 'value') else str(payment.status)
-            payment_dict["mode"] = payment.mode.value if hasattr(payment.mode, 'value') else str(payment.mode)
-            payments.append(PaymentRead(**payment_dict))
+            
+            # Create PaymentRead object with proper field mapping
+            # The PaymentRead model will handle alias mapping automatically
+            payment_read = PaymentRead(
+                id=payment.id,
+                amount=payment.amount,
+                method=payment.mode.value if hasattr(payment.mode, 'value') else str(payment.mode),
+                status=payment.status.value if hasattr(payment.status, 'value') else str(payment.status),
+                paymentDate=payment.payment_date,
+                createdAt=payment.created_at,
+                leaderId=payment.client_id,
+                orderId=payment.order_id,
+                referenceNumber=payment.reference_number,
+                client=client_info
+            )
+            payments.append(payment_read)
 
-        print(f"Returning {len(payments)} payments" + (f" for order {orderId}" if orderId else ""))
+        print(f"[Payments API] ✓ Returning {len(payments)} payments" + (f" for order {orderId}" if orderId else ""))
+        
+        if len(payments) > 0:
+            # Log first payment for debugging - this will show the Python object
+            print(f"[Payments API] First payment ID: {payments[0].id}, Amount: {payments[0].amount}")
+            # Log the serialized version to verify camelCase
+            sample_dict = payments[0].model_dump(by_alias=True)
+            print(f"[Payments API] Sample serialized payment (camelCase): {list(sample_dict.keys())}")
+        
         return payments
 
     except HTTPException:
         raise
     except Exception as e:
-        print(f"Error fetching payments: {str(e)}")
+        print(f"[Payments API] ERROR: Failed to fetch payments: {str(e)}")
+        import traceback
+        traceback.print_exc()
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
             detail=f"Failed to fetch payments: {str(e)}"
         )
 
-@router.get("/{payment_id}", response_model=PaymentRead)
+@router.get("/{payment_id}", response_model=PaymentRead, response_model_by_alias=True)
 def get_payment(payment_id: str, session: Session = Depends(get_session), current_user: User = Depends(get_current_user)):
     """Get a specific payment by ID."""
-    statement = select(Payment).where(Payment.id == payment_id)
-    payment = session.exec(statement).first()
-    
-    if not payment:
-        raise HTTPException(
-            status_code=status.HTTP_404_NOT_FOUND,
-            detail="Payment not found"
+    try:
+        statement = select(Payment, Client).outerjoin(Client, Payment.client_id == Client.id).where(Payment.id == payment_id)
+        result = session.exec(statement).first()
+        
+        if not result:
+            raise HTTPException(
+                status_code=status.HTTP_404_NOT_FOUND,
+                detail="Payment not found"
+            )
+        
+        payment, client = result
+        
+        # Build client info object
+        client_info = None
+        if client:
+            client_info = {
+                "id": client.id,
+                "name": client.name,
+                "type": client.type.value if hasattr(client.type, 'value') else str(client.type),
+                "contact": client.contact,
+                "address": client.address
+            }
+        
+        # Create PaymentRead object with proper field mapping
+        payment_read = PaymentRead(
+            id=payment.id,
+            amount=payment.amount,
+            method=payment.mode.value if hasattr(payment.mode, 'value') else str(payment.mode),
+            status=payment.status.value if hasattr(payment.status, 'value') else str(payment.status),
+            paymentDate=payment.payment_date,
+            createdAt=payment.created_at,
+            leaderId=payment.client_id,
+            orderId=payment.order_id,
+            referenceNumber=payment.reference_number,
+            client=client_info
         )
-    
-    return payment
+        
+        return payment_read
+    except HTTPException:
+        raise
+    except Exception as e:
+        print(f"[Payments API] ERROR: Failed to fetch payment: {str(e)}")
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail=f"Failed to fetch payment: {str(e)}"
+        )
 
-@router.post("/", response_model=PaymentRead, status_code=status.HTTP_201_CREATED)
+@router.post("/", response_model=PaymentRead, status_code=status.HTTP_201_CREATED, response_model_by_alias=True)
 def create_payment(
     payment_data: PaymentCreate,
     session: Session = Depends(get_session),
@@ -206,21 +266,31 @@ def create_payment(
         if order:
             session.refresh(order)
 
-        # Create response with complete client data
-        payment_dict = db_payment.model_dump()
-        payment_dict["client"] = {
+        # Build client info object
+        client_info = {
             "id": client.id,
             "name": client.name,
             "type": client.type.value if hasattr(client.type, 'value') else str(client.type),
             "contact": client.contact,
             "address": client.address
         }
-        # Convert enum values to strings
-        payment_dict["status"] = db_payment.status.value if hasattr(db_payment.status, 'value') else str(db_payment.status)
-        payment_dict["mode"] = db_payment.mode.value if hasattr(db_payment.mode, 'value') else str(db_payment.mode)
+
+        # Create PaymentRead response with proper field mapping
+        payment_read = PaymentRead(
+            id=db_payment.id,
+            amount=db_payment.amount,
+            method=db_payment.mode.value if hasattr(db_payment.mode, 'value') else str(db_payment.mode),
+            status=db_payment.status.value if hasattr(db_payment.status, 'value') else str(db_payment.status),
+            paymentDate=db_payment.payment_date,
+            createdAt=db_payment.created_at,
+            leaderId=db_payment.client_id,
+            orderId=db_payment.order_id,
+            referenceNumber=db_payment.reference_number,
+            client=client_info
+        )
 
         print(f"Payment created successfully with ID: {db_payment.id}")
-        return PaymentRead(**payment_dict)
+        return payment_read
 
     except HTTPException as he:
         print(f"HTTP Exception in payment creation: {str(he)}")
