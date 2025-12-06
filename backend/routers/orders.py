@@ -65,6 +65,8 @@ def get_orders(
                     orderNumber=order.order_number,  # Use the frontend field name
                     leaderId=order.client_id,        # Use the frontend field name
                     totalAmount=order.total_amount,  # Use the frontend field name
+                    paidAmount=order.paid_amount,    # CRITICAL: Include paid amount
+                    balance=order.balance,            # CRITICAL: Include balance
                     status=order.status.value if isinstance(order.status, OrderStatus) else str(order.status),
                     orderDate=order.order_date,      # Use the frontend field name
                     createdAt=order.created_at,      # Use the frontend field name

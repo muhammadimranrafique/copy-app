@@ -11,12 +11,12 @@ function getAuthHeaders() {
 
 async function fetchJSON(path: string, opts: RequestInit = {}) {
   const url = `${API_BASE}${path}`;
-  const headers = { 
+  const headers = {
     'Content-Type': 'application/json',
     'Accept': 'application/json',
     ...getAuthHeaders(),
     ...(opts.headers || {})
-  } as Record<string,string>;
+  } as Record<string, string>;
 
   // Add CORS mode and credentials
   opts.mode = 'cors';
@@ -114,15 +114,15 @@ export async function getOrders(params: any) {
   try {
     const qs = params && Object.keys(params).length ? `?${new URLSearchParams(params).toString()}` : '';
     const res = await fetchJSON(`/orders/${qs}`);
-    
+
     // Debug logging for response
     if (import.meta.env.VITE_DEBUG === 'true') {
       console.debug('[Orders Response]', res);
     }
-    
+
     // Normalize response to always return { orders: [] }
     const orders = Array.isArray(res) ? res : (res?.orders ?? []);
-    
+
     // Define order type for proper typing
     type OrderResponse = {
       id: string;
@@ -130,28 +130,39 @@ export async function getOrders(params: any) {
       leaderId: string;
       leaderName?: string;
       totalAmount: number;
+      paidAmount: number;
+      balance: number;
       status: string;
       orderDate: string;
       createdAt: string;
     };
-    
+
     // Debug logging
     if (import.meta.env.VITE_DEBUG === 'true') {
       console.debug('[Raw Orders Data]', orders);
     }
-    
+
     // Ensure all required fields are present and properly formatted
-    const normalizedOrders = orders.map((order: any) => ({
-      id: order.id || '',
-      orderNumber: order.orderNumber || order.order_number || 'N/A',
-      leaderId: order.leaderId || order.client_id || '',
-      leaderName: order.leaderName || 'N/A',
-      totalAmount: Number(order.totalAmount || order.total_amount || 0),
-      status: order.status || 'Pending',
-      orderDate: order.orderDate || order.order_date || new Date().toISOString(),
-      createdAt: order.createdAt || order.created_at || new Date().toISOString()
-    }));
-    
+    // CRITICAL: Include paidAmount and balance for payment tracking display
+    const normalizedOrders = orders.map((order: any) => {
+      const totalAmount = Number(order.totalAmount || order.total_amount || 0);
+      const paidAmount = Number(order.paidAmount || order.paid_amount || 0);
+      const balance = Number(order.balance ?? (totalAmount - paidAmount));
+
+      return {
+        id: order.id || '',
+        orderNumber: order.orderNumber || order.order_number || 'N/A',
+        leaderId: order.leaderId || order.client_id || '',
+        leaderName: order.leaderName || 'N/A',
+        totalAmount,
+        paidAmount,
+        balance,
+        status: order.status || 'Pending',
+        orderDate: order.orderDate || order.order_date || new Date().toISOString(),
+        createdAt: order.createdAt || order.created_at || new Date().toISOString()
+      };
+    });
+
     return { orders: normalizedOrders };
   } catch (error) {
     console.error('[Orders API Error]', error);
@@ -214,14 +225,14 @@ export async function getPayments(params: any = {}) {
   try {
     const qs = params && Object.keys(params).length ? `?${new URLSearchParams(params).toString()}` : '';
     const res = await fetchJSON(`/payments/${qs}`);
-    
+
     if (import.meta.env.VITE_DEBUG === 'true') {
       console.debug('[Payments Response]', res);
     }
-    
+
     // Normalize response to always return { payments: [] }
     const payments = Array.isArray(res) ? res : (res?.payments ?? []);
-    
+
     // Ensure all required fields are present and properly formatted
     const normalizedPayments = payments.map((payment: any) => ({
       id: payment.id || '',
@@ -241,7 +252,7 @@ export async function getPayments(params: any = {}) {
         address: payment.client.address
       } : null
     }));
-    
+
     return { payments: normalizedPayments };
   } catch (error) {
     console.error('[Payments API Error]', error);
@@ -381,11 +392,11 @@ export async function getDashboardData(params: any) {
   try {
     const qs = params && Object.keys(params).length ? `?${new URLSearchParams(params).toString()}` : '';
     const res = await fetchJSON(`/dashboard/stats${qs}`);
-    
+
     if (import.meta.env.VITE_DEBUG === 'true') {
       console.debug('[Dashboard Response]', res);
     }
-    
+
     return res;
   } catch (error) {
     console.error('[Dashboard API Error]', error);
@@ -401,14 +412,14 @@ export async function getExpenses(params: any) {
   try {
     const qs = params && Object.keys(params).length ? `?${new URLSearchParams(params).toString()}` : '';
     const res = await fetchJSON(`/expenses/${qs}`);
-    
+
     if (import.meta.env.VITE_DEBUG === 'true') {
       console.debug('[Expenses Response]', res);
     }
-    
+
     // Normalize response to always return { expenses: [] }
     const expenses = Array.isArray(res) ? res : (res?.expenses ?? []);
-    
+
     // Ensure all required fields are present and properly formatted
     const normalizedExpenses = expenses.map((expense: any) => ({
       id: expense.id || '',
@@ -419,7 +430,7 @@ export async function getExpenses(params: any) {
       paymentMethod: expense.paymentMethod || expense.payment_method || 'Cash',
       referenceNumber: expense.referenceNumber || expense.reference_number || undefined
     }));
-    
+
     return { expenses: normalizedExpenses };
   } catch (error) {
     console.error('[Expenses API Error]', error);
@@ -432,13 +443,13 @@ export async function createExpense(data: any) {
     await new Promise(r => setTimeout(r, 300));
     return { success: true, expense: { id: Date.now().toString(), ...data } };
   }
-  
+
   try {
     // Validate required fields
     if (!data.category || !data.amount || !data.description) {
       throw new Error('Missing required fields: category, amount, and description are required');
     }
-    
+
     // Format the expense data for the API
     const expenseData = {
       category: data.category,
@@ -453,15 +464,15 @@ export async function createExpense(data: any) {
       console.debug('[Expense Request]', expenseData);
     }
 
-    const res = await fetchJSON('/expenses/', { 
-      method: 'POST', 
+    const res = await fetchJSON('/expenses/', {
+      method: 'POST',
       body: JSON.stringify(expenseData)
     });
-    
+
     if (import.meta.env.VITE_DEBUG === 'true') {
       console.debug('[Expense Response]', res);
     }
-    
+
     return { success: true, expense: res };
   } catch (error) {
     console.error('[Create Expense Error]', error);
@@ -474,13 +485,13 @@ export async function updateExpense(id: string, data: any) {
     await new Promise(r => setTimeout(r, 300));
     return { success: true, expense: { id, ...data } };
   }
-  
+
   try {
     // Validate required fields
     if (!data.category || !data.amount || !data.description) {
       throw new Error('Missing required fields: category, amount, and description are required');
     }
-    
+
     // Format the expense data for the API
     const expenseData = {
       category: data.category,
@@ -495,15 +506,15 @@ export async function updateExpense(id: string, data: any) {
       console.debug('[Update Expense Request]', expenseData);
     }
 
-    const res = await fetchJSON(`/expenses/${id}`, { 
-      method: 'PUT', 
+    const res = await fetchJSON(`/expenses/${id}`, {
+      method: 'PUT',
       body: JSON.stringify(expenseData)
     });
-    
+
     if (import.meta.env.VITE_DEBUG === 'true') {
       console.debug('[Update Expense Response]', res);
     }
-    
+
     return { success: true, expense: res };
   } catch (error) {
     console.error('[Update Expense Error]', error);
@@ -527,14 +538,14 @@ export async function getExpense(id: string) {
     if (!expense) throw new Error('Expense not found');
     return expense;
   }
-  
+
   try {
     const res = await fetchJSON(`/expenses/${id}`);
-    
+
     if (import.meta.env.VITE_DEBUG === 'true') {
       console.debug('[Get Expense Response]', res);
     }
-    
+
     // Normalize the response
     return {
       id: res.id || '',

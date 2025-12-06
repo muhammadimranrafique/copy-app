@@ -18,11 +18,22 @@ export default function Login() {
   const [password, setPassword] = useState('');
   const [remember, setRemember] = useState(true);
 
+  // Redirect to dashboard if user is authenticated
+  // IMPORTANT: Check for valid token to prevent flickering from stale localStorage data
   useEffect(() => {
-    if (user && !isLoading) {
-      setTimeout(() => {
+    const token = localStorage.getItem('access_token');
+
+    // Only redirect if:
+    // 1. User object exists
+    // 2. Not currently loading
+    // 3. Valid token exists in localStorage
+    if (user && !isLoading && token) {
+      // Small delay to ensure smooth transition
+      const timer = setTimeout(() => {
         navigate('/', { replace: true });
       }, 100);
+
+      return () => clearTimeout(timer);
     }
   }, [user, isLoading, navigate]);
 
@@ -30,7 +41,7 @@ export default function Login() {
     const params = new URLSearchParams(window.location.search);
     const errorParam = params.get('error');
     const errorDescription = params.get('error_description');
-    
+
     if (errorParam) {
       setError(errorDescription || 'Authentication failed. Please try again.');
       setIsAuthenticating(false);
@@ -61,12 +72,17 @@ export default function Login() {
     window.location.reload();
   };
 
-  if (isLoading) {
+  // Show loading state while verifying authentication
+  // or if user is authenticated and about to redirect
+  const token = localStorage.getItem('access_token');
+  if (isLoading || (user && token)) {
     return (
       <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-primary/10 via-background to-primary/5">
         <div className="text-center space-y-3">
           <Loader2 className="w-8 h-8 animate-spin text-primary mx-auto" />
-          <p className="text-sm text-muted-foreground">Loading authentication...</p>
+          <p className="text-sm text-muted-foreground">
+            {user ? 'Redirecting to dashboard...' : 'Loading authentication...'}
+          </p>
         </div>
       </div>
     );

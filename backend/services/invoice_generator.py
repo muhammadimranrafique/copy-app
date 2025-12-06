@@ -240,76 +240,68 @@ class ProfessionalInvoiceGenerator:
         story.append(Spacer(1, 4*mm))
 
     def _create_payment_summary(self, story, styles, order_data: Dict[str, Any], payment_history: Optional[List[Dict[str, Any]]], company_settings: Optional[Dict[str, Any]] = None):
-        """Create conditional payment summary matching the reference image style."""
-        
-        # Logic: Only show if partial payments exist
-        if not payment_history or len(payment_history) == 0:
-            # Show "No previous payments" message
-            msg = Paragraph(
-                "<i>No previous payments recorded for this order</i>",
-                ParagraphStyle('NoPayment', parent=styles['Normal'], alignment=TA_CENTER, textColor=self.text_light, fontSize=9)
-            )
-            story.append(msg)
-            story.append(Spacer(1, 2*mm))
-            return
-
-        try:
-            # Extract values BEFORE null check (CRITICAL FIX)
-            total_amount = float((order_data or {}).get('total_amount', 0))
-            total_paid = sum(float(p.get('amount', 0)) for p in payment_history)
-            balance_due = total_amount - total_paid
-        except:
-            return
-
-        # Show payment summary if ANY payments have been made
-        # This allows users to see payment history even when fully paid
-        if total_paid <= 0:
-            # Only hide if no payments at all
-            return
+        """Create payment summary with clear deduction display showing amount received subtracted from total."""
 
         currency_symbol = (company_settings or {}).get('currency_symbol', 'Rs')
 
-        # Section Header (BALANCED FONT SIZE)
+        # Get order totals from order_data (these are the source of truth)
+        total_amount = float((order_data or {}).get('total_amount', 0))
+        total_paid = float((order_data or {}).get('paid_amount', 0))
+        balance_due = float((order_data or {}).get('balance', total_amount - total_paid))
+
+        # If payment_history exists, calculate from it (fallback)
+        if payment_history and len(payment_history) > 0:
+            calculated_paid = sum(float(p.get('amount', 0)) for p in payment_history)
+            if calculated_paid > 0:
+                total_paid = calculated_paid
+                balance_due = total_amount - total_paid
+
+        # Only show payment summary if there are payments made
+        if total_paid <= 0:
+            return
+
+        # Section Header with icon
         story.append(Paragraph(
-            f'<b><font color={self.primary_dark}>■ PAYMENT SUMMARY</font></b>',
+            f'<b><font color=#1e40af>■ PAYMENT SUMMARY</font></b>',
             ParagraphStyle('SummaryHeader', parent=styles['Normal'], fontSize=12, spaceAfter=2)
         ))
         story.append(Spacer(1, 2*mm))
 
-        # Summary Table (3 Columns to match our data, styled like the 4-column one in image)
-        # Headers (BALANCED FONT SIZE)
+        # Create 3-column payment summary table matching reference image style
+        # Headers
         headers = [
             Paragraph('<b>Total Order Amount</b>', ParagraphStyle('H1', parent=styles['Normal'], alignment=TA_CENTER, fontSize=9, textColor=self.text_medium)),
             Paragraph('<b>Total Paid to Date</b>', ParagraphStyle('H2', parent=styles['Normal'], alignment=TA_CENTER, fontSize=9, textColor=self.text_medium)),
             Paragraph('<b>Remaining Balance</b>', ParagraphStyle('H3', parent=styles['Normal'], alignment=TA_CENTER, fontSize=9, textColor=self.text_medium)),
         ]
-        
-        # Values (BALANCED FONT SIZE - reduced from 16 to 13 for visual balance)
+
+        # Values with color coding: Red for total, Green for paid, Orange for balance
         values = [
-            Paragraph(f'<b><font size=13 color={self.accent_red}>{currency_symbol} {total_amount:,.2f}</font></b>', 
+            Paragraph(f'<b><font size=13 color=#ef4444>{currency_symbol} {total_amount:,.2f}</font></b>',
                      ParagraphStyle('V1', parent=styles['Normal'], alignment=TA_CENTER)),
-            Paragraph(f'<b><font size=13 color={self.accent_green}>{currency_symbol} {total_paid:,.2f}</font></b>', 
+            Paragraph(f'<b><font size=13 color=#10b981>{currency_symbol} {total_paid:,.2f}</font></b>',
                      ParagraphStyle('V2', parent=styles['Normal'], alignment=TA_CENTER)),
-            Paragraph(f'<b><font size=13 color={self.accent_orange}>{currency_symbol} {balance_due:,.2f}</font></b>', 
+            Paragraph(f'<b><font size=13 color=#f97316>{currency_symbol} {balance_due:,.2f}</font></b>',
                      ParagraphStyle('V3', parent=styles['Normal'], alignment=TA_CENTER)),
         ]
 
         summary_data = [headers, values]
         summary_table = Table(summary_data, colWidths=[63*mm, 63*mm, 64*mm])
         summary_table.setStyle(TableStyle([
-            # General
+            # General alignment
             ('ALIGN', (0, 0), (-1, -1), 'CENTER'),
             ('VALIGN', (0, 0), (-1, -1), 'MIDDLE'),
-            ('GRID', (0, 0), (-1, -1), 1, self.primary), # Blue borders
+            # Border styling - blue borders
+            ('GRID', (0, 0), (-1, -1), 1, self.primary),
             ('BOX', (0, 0), (-1, -1), 1.5, self.primary),
-            # Header Row
+            # Header Row - light blue background
             ('BACKGROUND', (0, 0), (-1, 0), self.primary_light),
             ('TOPPADDING', (0, 0), (-1, 0), 8),
             ('BOTTOMPADDING', (0, 0), (-1, 0), 8),
-            # Value Row
-            ('BACKGROUND', (0, 1), (0, 1), self.accent_red_light),    # Red bg for Total
-            ('BACKGROUND', (1, 1), (1, 1), self.accent_green_light),  # Green bg for Paid
-            ('BACKGROUND', (2, 1), (2, 1), self.accent_orange_light), # Orange bg for Balance
+            # Value Row - color-coded backgrounds matching the text colors
+            ('BACKGROUND', (0, 1), (0, 1), self.accent_red_light),    # Light red for Total
+            ('BACKGROUND', (1, 1), (1, 1), self.accent_green_light),  # Light green for Paid
+            ('BACKGROUND', (2, 1), (2, 1), self.accent_orange_light), # Light orange for Balance
             ('TOPPADDING', (0, 1), (-1, 1), 10),
             ('BOTTOMPADDING', (0, 1), (-1, 1), 10),
         ]))
