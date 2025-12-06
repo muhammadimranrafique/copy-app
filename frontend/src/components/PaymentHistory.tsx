@@ -46,14 +46,10 @@ export function PaymentHistory({ orderId, orderTotal, currentBalance, onDownload
 
             if (!response.ok) throw new Error('Failed to fetch payment history');
 
-            const allPayments = await response.json();
-            // Filter payments for this specific order
-            const orderPayments = allPayments.filter((p: any) => p.orderId === orderId);
+            // Backend now filters by orderId and sorts by payment_date ascending
+            const orderPayments = await response.json();
 
-            // Sort by payment date
-            orderPayments.sort((a: any, b: any) =>
-                new Date(a.paymentDate).getTime() - new Date(b.paymentDate).getTime()
-            );
+            console.log(`[PaymentHistory] Fetched ${orderPayments.length} payments for order ${orderId}`);
 
             setPayments(orderPayments);
         } catch (error) {

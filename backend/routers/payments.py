@@ -17,23 +17,37 @@ router = APIRouter(prefix="/payments", tags=["Payments"])
 def get_payments(
     skip: int = 0,
     limit: int = 100,
+    orderId: str = None,  # Optional filter by order ID
     session: Session = Depends(get_session),
     current_user: User = Depends(get_current_user)
 ):
-    """Get all payments."""
+    """Get all payments, optionally filtered by order ID."""
     try:
-        # Join with Client to get leader names
+        # Build base query
         statement = (
             select(Payment, Client)
             .outerjoin(Client, Payment.client_id == Client.id)
-            .order_by(Payment.created_at.desc())
-            .offset(skip)
-            .limit(limit)
         )
-        
+
+        # Filter by order_id if provided
+        if orderId:
+            try:
+                order_uuid = UUID(orderId)
+                statement = statement.where(Payment.order_id == order_uuid)
+                print(f"Filtering payments by order_id: {order_uuid}")
+            except ValueError:
+                print(f"Invalid orderId format: {orderId}")
+                raise HTTPException(
+                    status_code=status.HTTP_400_BAD_REQUEST,
+                    detail=f"Invalid order ID format: {orderId}"
+                )
+
+        # Apply sorting and pagination
+        statement = statement.order_by(Payment.payment_date.asc()).offset(skip).limit(limit)
+
         results = session.exec(statement).all()
         payments = []
-        
+
         for payment, client in results:
             payment_dict = payment.model_dump()
             # Add complete client data
@@ -51,9 +65,12 @@ def get_payments(
             payment_dict["status"] = payment.status.value if hasattr(payment.status, 'value') else str(payment.status)
             payment_dict["mode"] = payment.mode.value if hasattr(payment.mode, 'value') else str(payment.mode)
             payments.append(PaymentRead(**payment_dict))
-        
+
+        print(f"Returning {len(payments)} payments" + (f" for order {orderId}" if orderId else ""))
         return payments
-        
+
+    except HTTPException:
+        raise
     except Exception as e:
         print(f"Error fetching payments: {str(e)}")
         raise HTTPException(

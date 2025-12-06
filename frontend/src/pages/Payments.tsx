@@ -41,19 +41,37 @@ export default function Payments() {
     paymentDate: new Date().toISOString().split('T')[0],
     leaderId: '',
     referenceNumber: '',
-    orderId: ''
+    orderId: 'none' // Changed from '' to 'none' to fix Select.Item error
   });
   const [leaderOrders, setLeaderOrders] = useState<any[]>([]);
+  const [loadingOrders, setLoadingOrders] = useState(false);
 
   useEffect(() => {
     if (formData.leaderId) {
       const fetchOrders = async () => {
         try {
+          setLoadingOrders(true);
           // @ts-ignore
           const orders = await api.getOrdersByLeader(formData.leaderId);
-          setLeaderOrders(orders);
+
+          // Ensure all orders have required fields with default values
+          const normalizedOrders = Array.isArray(orders) ? orders.map((order: any) => ({
+            ...order,
+            balance: order.balance ?? order.totalAmount ?? order.total_amount ?? 0,
+            paidAmount: order.paidAmount ?? order.paid_amount ?? 0,
+            totalAmount: order.totalAmount ?? order.total_amount ?? 0,
+            status: order.status ?? 'Pending',
+            // Handle both camelCase (orderNumber) and snake_case (order_number) from API
+            orderNumber: order.orderNumber ?? order.order_number ?? 'N/A'
+          })) : [];
+
+          setLeaderOrders(normalizedOrders);
         } catch (error) {
           console.error('Failed to fetch orders', error);
+          toast.error('Failed to load orders for this leader');
+          setLeaderOrders([]);
+        } finally {
+          setLoadingOrders(false);
         }
       };
       fetchOrders();
@@ -110,7 +128,8 @@ export default function Payments() {
       const result = await createPayment({
         ...formData,
         amount: Number(formData.amount),
-        paymentDate: formData.paymentDate ? new Date(formData.paymentDate).toISOString() : undefined
+        paymentDate: formData.paymentDate ? new Date(formData.paymentDate).toISOString() : undefined,
+        orderId: formData.orderId === 'none' ? undefined : formData.orderId // Convert 'none' to undefined
       });
 
       if (import.meta.env.VITE_DEBUG === 'true') {
@@ -125,7 +144,7 @@ export default function Payments() {
         paymentDate: new Date().toISOString().split('T')[0],
         leaderId: '',
         referenceNumber: '',
-        orderId: ''
+        orderId: 'none' // Reset to 'none' instead of empty string
       });
       refetchPayments();
     } catch (error: any) {
@@ -190,7 +209,7 @@ export default function Payments() {
             <form onSubmit={handleSubmit} className="space-y-4">
               <div>
                 <Label htmlFor="leader">Leader *</Label>
-                <Select value={formData.leaderId} onValueChange={(value) => setFormData({ ...formData, leaderId: value, orderId: '' })}>
+                <Select value={formData.leaderId} onValueChange={(value) => setFormData({ ...formData, leaderId: value, orderId: 'none' })}>
                   <SelectTrigger>
                     <SelectValue placeholder="Select a leader" />
                   </SelectTrigger>
@@ -208,74 +227,110 @@ export default function Payments() {
               {formData.leaderId && (
                 <div>
                   <Label htmlFor="order">Order (Optional)</Label>
-                  <Select value={formData.orderId} onValueChange={(value) => setFormData({ ...formData, orderId: value })}>
+                  <Select
+                    value={formData.orderId}
+                    onValueChange={(value) => setFormData({ ...formData, orderId: value })}
+                    disabled={loadingOrders}
+                  >
                     <SelectTrigger>
-                      <SelectValue placeholder="Select an order or leave blank for general payment" />
+                      <SelectValue placeholder={
+                        loadingOrders
+                          ? "Loading orders..."
+                          : "Select an order or leave blank for general payment"
+                      } />
                     </SelectTrigger>
                     <SelectContent>
-                      <SelectItem value="">No specific order (General Payment)</SelectItem>
-                      {leaderOrders
-                        .filter((order: any) => order.status !== 'Paid' && order.balance > 0)
-                        .map((order: any) => (
-                          <SelectItem key={order.id} value={order.id}>
-                            {order.orderNumber} - Rs {order.totalAmount?.toLocaleString()}
-                            (Balance: Rs {order.balance?.toLocaleString()})
-                          </SelectItem>
-                        ))}
+                      <SelectItem value="none">No specific order (General Payment)</SelectItem>
+                      {Array.isArray(leaderOrders) && leaderOrders
+                        .filter((order: any) => {
+                          // Safe filtering with null checks
+                          if (!order) return false;
+                          const status = order.status ?? 'Pending';
+                          const balance = order.balance ?? order.totalAmount ?? 0;
+                          return status !== 'Paid' && balance > 0;
+                        })
+                        .map((order: any) => {
+                          // Safe rendering with default values
+                          const orderNumber = order.orderNumber ?? 'N/A';
+                          const totalAmount = order.totalAmount ?? 0;
+                          const balance = order.balance ?? totalAmount;
+
+                          return (
+                            <SelectItem key={order.id} value={order.id}>
+                              {orderNumber} - Rs {totalAmount.toLocaleString()}
+                              (Balance: Rs {balance.toLocaleString()})
+                            </SelectItem>
+                          );
+                        })}
                     </SelectContent>
                   </Select>
-                  {leaderOrders.length === 0 && (
+                  {!loadingOrders && leaderOrders.length === 0 && (
                     <p className="text-xs text-muted-foreground mt-1">No unpaid orders found for this leader</p>
+                  )}
+                  {loadingOrders && (
+                    <p className="text-xs text-blue-600 mt-1">Loading orders...</p>
                   )}
                 </div>
               )}
 
               {/* Remaining Balance Display */}
-              {formData.orderId && leaderOrders.length > 0 && (() => {
-                const selectedOrder = leaderOrders.find((o: any) => o.id === formData.orderId);
-                if (!selectedOrder) return null;
+              {formData.orderId && formData.orderId !== 'none' && Array.isArray(leaderOrders) && leaderOrders.length > 0 && (() => {
+                try {
+                  const selectedOrder = leaderOrders.find((o: any) => o?.id === formData.orderId);
+                  if (!selectedOrder) return null;
 
-                const remainingBalance = selectedOrder.balance || 0;
-                const willExceed = formData.amount > remainingBalance;
+                  // Safe access with default values
+                  const totalAmount = selectedOrder.totalAmount ?? 0;
+                  const paidAmount = selectedOrder.paidAmount ?? 0;
+                  const remainingBalance = selectedOrder.balance ?? (totalAmount - paidAmount);
+                  const willExceed = formData.amount > remainingBalance;
 
-                return (
-                  <div className="bg-blue-50 border border-blue-200 rounded-lg p-4 space-y-2">
-                    <div className="flex items-center justify-between">
-                      <span className="text-sm font-medium text-blue-900">Order Details</span>
-                      <Badge variant="outline" className="bg-white">
-                        {selectedOrder.orderNumber}
-                      </Badge>
+                  return (
+                    <div className="bg-blue-50 border border-blue-200 rounded-lg p-4 space-y-2">
+                      <div className="flex items-center justify-between">
+                        <span className="text-sm font-medium text-blue-900">Order Details</span>
+                        <Badge variant="outline" className="bg-white">
+                          {selectedOrder.orderNumber ?? 'N/A'}
+                        </Badge>
+                      </div>
+                      <div className="grid grid-cols-2 gap-2 text-sm">
+                        <div>
+                          <p className="text-blue-600">Total Amount</p>
+                          <p className="font-semibold text-blue-900">Rs {totalAmount.toLocaleString()}</p>
+                        </div>
+                        <div>
+                          <p className="text-blue-600">Paid So Far</p>
+                          <p className="font-semibold text-blue-900">Rs {paidAmount.toLocaleString()}</p>
+                        </div>
+                      </div>
+                      <div className="pt-2 border-t border-blue-200">
+                        <p className="text-sm text-blue-600">Remaining Balance</p>
+                        <p className="text-2xl font-bold text-blue-900">Rs {remainingBalance.toLocaleString()}</p>
+                      </div>
+                      {willExceed && formData.amount > 0 && (
+                        <div className="bg-red-50 border border-red-200 rounded p-2 mt-2">
+                          <p className="text-xs text-red-700 font-medium">
+                            ⚠️ Payment amount exceeds remaining balance by Rs {(formData.amount - remainingBalance).toLocaleString()}
+                          </p>
+                        </div>
+                      )}
+                      {formData.amount > 0 && formData.amount <= remainingBalance && (
+                        <div className="bg-green-50 border border-green-200 rounded p-2 mt-2">
+                          <p className="text-xs text-green-700">
+                            ✓ New balance after payment: Rs {(remainingBalance - formData.amount).toLocaleString()}
+                          </p>
+                        </div>
+                      )}
                     </div>
-                    <div className="grid grid-cols-2 gap-2 text-sm">
-                      <div>
-                        <p className="text-blue-600">Total Amount</p>
-                        <p className="font-semibold text-blue-900">Rs {selectedOrder.totalAmount?.toLocaleString()}</p>
-                      </div>
-                      <div>
-                        <p className="text-blue-600">Paid So Far</p>
-                        <p className="font-semibold text-blue-900">Rs {selectedOrder.paidAmount?.toLocaleString()}</p>
-                      </div>
+                  );
+                } catch (error) {
+                  console.error('Error rendering balance display:', error);
+                  return (
+                    <div className="bg-red-50 border border-red-200 rounded-lg p-3">
+                      <p className="text-xs text-red-700">Unable to load order details. Please try again.</p>
                     </div>
-                    <div className="pt-2 border-t border-blue-200">
-                      <p className="text-sm text-blue-600">Remaining Balance</p>
-                      <p className="text-2xl font-bold text-blue-900">Rs {remainingBalance.toLocaleString()}</p>
-                    </div>
-                    {willExceed && formData.amount > 0 && (
-                      <div className="bg-red-50 border border-red-200 rounded p-2 mt-2">
-                        <p className="text-xs text-red-700 font-medium">
-                          ⚠️ Payment amount exceeds remaining balance by Rs {(formData.amount - remainingBalance).toLocaleString()}
-                        </p>
-                      </div>
-                    )}
-                    {formData.amount > 0 && formData.amount <= remainingBalance && (
-                      <div className="bg-green-50 border border-green-200 rounded p-2 mt-2">
-                        <p className="text-xs text-green-700">
-                          ✓ New balance after payment: Rs {(remainingBalance - formData.amount).toLocaleString()}
-                        </p>
-                      </div>
-                    )}
-                  </div>
-                );
+                  );
+                }
               })()}
 
               <div>
