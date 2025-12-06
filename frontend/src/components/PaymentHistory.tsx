@@ -34,6 +34,9 @@ export function PaymentHistory({ orderId, orderTotal, currentBalance, onDownload
         try {
             setLoading(true);
             const token = localStorage.getItem('access_token');
+
+            console.log(`[PaymentHistory] Fetching payments for order: ${orderId}`);
+
             const response = await fetch(
                 `${import.meta.env.VITE_API_BASE_URL || 'http://127.0.0.1:8000/api/v1'}/payments/?orderId=${orderId}`,
                 {
@@ -44,18 +47,30 @@ export function PaymentHistory({ orderId, orderTotal, currentBalance, onDownload
                 }
             );
 
-            if (!response.ok) throw new Error('Failed to fetch payment history');
+            if (!response.ok) {
+                console.error(`[PaymentHistory] API request failed: ${response.status} ${response.statusText}`);
+                throw new Error('Failed to fetch payment history');
+            }
 
             // Backend now filters by orderId and sorts by payment_date ascending
             const orderPayments = await response.json();
 
-            console.log(`[PaymentHistory] Fetched ${orderPayments.length} payments for order ${orderId}`);
+            console.log(`[PaymentHistory] ✓ Fetched ${orderPayments.length} payments for order ${orderId}`);
+            console.log('[PaymentHistory] Raw API Response:', orderPayments);
+
+            if (orderPayments.length > 0) {
+                console.log('[PaymentHistory] First payment sample:', orderPayments[0]);
+                console.log('[PaymentHistory] Field names:', Object.keys(orderPayments[0]));
+            }
 
             setPayments(orderPayments);
         } catch (error) {
-            console.error('Error fetching payment history:', error);
+            console.error('[PaymentHistory] Error fetching payment history:', error);
             toast.error('Failed to load payment history');
+            // Set empty array on error to show empty state instead of blank screen
+            setPayments([]);
         } finally {
+            // Always set loading to false to prevent infinite loading state
             setLoading(false);
         }
     };
@@ -227,7 +242,19 @@ export function PaymentHistory({ orderId, orderTotal, currentBalance, onDownload
                                                 </div>
                                                 <div className="flex items-center gap-2 text-sm text-muted-foreground">
                                                     <Calendar className="w-3 h-3" />
-                                                    {format(new Date(payment.paymentDate), 'MMM dd, yyyy')}
+                                                    {(() => {
+                                                        try {
+                                                            const date = new Date(payment.paymentDate);
+                                                            if (isNaN(date.getTime())) {
+                                                                console.error('[PaymentHistory] Invalid date:', payment.paymentDate);
+                                                                return 'Invalid date';
+                                                            }
+                                                            return format(date, 'MMM dd, yyyy');
+                                                        } catch (error) {
+                                                            console.error('[PaymentHistory] Date parsing error:', error, payment.paymentDate);
+                                                            return 'Date unavailable';
+                                                        }
+                                                    })()}
                                                 </div>
                                             </div>
                                             <div className="text-right">

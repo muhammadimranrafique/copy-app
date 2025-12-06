@@ -232,6 +232,7 @@ class PaymentRead(SQLModel):
         from_attributes = True
         populate_by_name = True
         use_enum_values = True
+        by_alias = True  # Enable serialization by alias for camelCase field names
         json_encoders = {
             UUID: str,
             datetime: lambda v: v.isoformat(),
