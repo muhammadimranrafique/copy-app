@@ -32,7 +32,7 @@ def get_leaders(
         # Calculate summary statistics
         total_orders = sum(float(order.total_amount) for order in orders)
         total_paid = sum(float(payment.amount) for payment in payments)
-        outstanding_balance = total_orders - total_paid + (leader.opening_balance or 0)
+        outstanding_balance = total_orders - total_paid
         
         # Add summary to leader data
         leader_dict['total_orders'] = len(orders)
@@ -147,10 +147,15 @@ def get_leader_ledger(
         select(Payment).where(Payment.client_id == leader_id).order_by(Payment.payment_date.desc())
     ).all()
     
+    # Fetch unallocated payments (no order_id)
+    unallocated_payments = session.exec(
+        select(Payment).where(Payment.client_id == leader_id, Payment.order_id == None).order_by(Payment.payment_date.desc())
+    ).all()
+    
     # Calculate summary statistics
     total_order_amount = sum(float(order.total_amount) for order in orders)
     total_paid = sum(float(payment.amount) for payment in all_payments)
-    total_outstanding = total_order_amount - total_paid + (client.opening_balance or 0)
+    total_outstanding = total_order_amount - total_paid
     
     # Build orders list with payment details
     orders_list = []
@@ -181,6 +186,17 @@ def get_leader_ledger(
             "payments": payments_list
         })
     
+    # Build unallocated payments list
+    unallocated_payments_list = []
+    for payment in unallocated_payments:
+        unallocated_payments_list.append({
+            "id": str(payment.id),
+            "payment_date": payment.payment_date.isoformat() if payment.payment_date else None,
+            "amount": float(payment.amount),
+            "mode": payment.mode.value if hasattr(payment.mode, 'value') else str(payment.mode),
+            "reference_number": payment.reference_number or ""
+        })
+    
     return {
         "client": {
             "id": str(client.id),
@@ -196,7 +212,8 @@ def get_leader_ledger(
             "total_paid": total_paid,
             "total_outstanding": total_outstanding
         },
-        "orders": orders_list
+        "orders": orders_list,
+        "unallocated_payments": unallocated_payments_list
     }
 
 @router.get("/{leader_id}/payments")
@@ -255,7 +272,7 @@ def get_leader_summary(
     
     total_orders = sum(float(order.total_amount) for order in orders)
     total_paid = sum(float(payment.amount) for payment in payments)
-    outstanding_balance = total_orders - total_paid + (client.opening_balance or 0)
+    outstanding_balance = total_orders - total_paid
     
     return {
         "total_orders": total_orders,
