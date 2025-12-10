@@ -179,6 +179,82 @@ export async function createOrder(data: any) {
   return { success: true, order: res };
 }
 
+export async function updateOrder(orderId: string, data: any) {
+  if (USE_MOCK) {
+    await new Promise(r => setTimeout(r, 300));
+    return { success: true, order: { id: orderId, ...data } };
+  }
+
+  try {
+    if (import.meta.env.VITE_DEBUG === 'true') {
+      console.debug('[Update Order Request]', { orderId, data });
+    }
+
+    const res = await fetchJSON(`/orders/${orderId}`, {
+      method: 'PUT',
+      body: JSON.stringify(data)
+    });
+
+    if (import.meta.env.VITE_DEBUG === 'true') {
+      console.debug('[Update Order Response]', res);
+    }
+
+    return { success: true, order: res };
+  } catch (error) {
+    console.error('[Update Order Error]', error);
+    throw error;
+  }
+}
+
+export async function deleteOrder(orderId: string) {
+  if (USE_MOCK) {
+    await new Promise(r => setTimeout(r, 300));
+    return { success: true };
+  }
+
+  try {
+    if (import.meta.env.VITE_DEBUG === 'true') {
+      console.debug('[Delete Order Request]', { orderId });
+    }
+
+    await fetchJSON(`/orders/${orderId}`, { method: 'DELETE' });
+
+    if (import.meta.env.VITE_DEBUG === 'true') {
+      console.debug('[Delete Order Success]', { orderId });
+    }
+
+    return { success: true };
+  } catch (error) {
+    console.error('[Delete Order Error]', error);
+    throw error;
+  }
+}
+
+export async function getOrderPaymentSummary(orderId: string) {
+  if (USE_MOCK) {
+    await new Promise(r => setTimeout(r, 300));
+    return { count: 0, total: 0, order_number: 'MOCK-001' };
+  }
+
+  try {
+    if (import.meta.env.VITE_DEBUG === 'true') {
+      console.debug('[Get Payment Summary Request]', { orderId });
+    }
+
+    const res = await fetchJSON(`/orders/${orderId}/payment-summary`);
+
+    if (import.meta.env.VITE_DEBUG === 'true') {
+      console.debug('[Get Payment Summary Response]', res);
+    }
+
+    return res;
+  } catch (error) {
+    console.error('[Get Payment Summary Error]', error);
+    throw error;
+  }
+}
+
+
 export async function getLeaders(params: any) {
   if (USE_MOCK) {
     await new Promise(r => setTimeout(r, 300));
@@ -371,6 +447,82 @@ export async function downloadPaymentReceipt(paymentId: string): Promise<void> {
     throw error;
   }
 }
+
+export async function updatePayment(paymentId: string, data: any) {
+  if (USE_MOCK) {
+    await new Promise(r => setTimeout(r, 300));
+    return { success: true, payment: { id: paymentId, ...data } };
+  }
+
+  try {
+    // Validate required fields
+    if (data.amount !== undefined && data.amount <= 0) {
+      throw new Error('Payment amount must be greater than 0');
+    }
+
+    // Format the payment data for the API (only include fields that are being updated)
+    const paymentData: any = {};
+
+    if (data.amount !== undefined) {
+      paymentData.amount = Number(data.amount);
+    }
+
+    if (data.method !== undefined) {
+      paymentData.method = data.method;
+    }
+
+    if (data.paymentDate !== undefined) {
+      paymentData.paymentDate = data.paymentDate ? new Date(data.paymentDate).toISOString().split('T')[0] : undefined;
+    }
+
+    if (data.referenceNumber !== undefined) {
+      paymentData.referenceNumber = data.referenceNumber || undefined;
+    }
+
+    if (import.meta.env.VITE_DEBUG === 'true') {
+      console.debug('[Update Payment Request]', { paymentId, paymentData });
+    }
+
+    const res = await fetchJSON(`/payments/${paymentId}`, {
+      method: 'PUT',
+      body: JSON.stringify(paymentData)
+    });
+
+    if (import.meta.env.VITE_DEBUG === 'true') {
+      console.debug('[Update Payment Response]', res);
+    }
+
+    return { success: true, payment: res };
+  } catch (error) {
+    console.error('[Update Payment Error]', error);
+    throw error;
+  }
+}
+
+export async function deletePayment(paymentId: string) {
+  if (USE_MOCK) {
+    await new Promise(r => setTimeout(r, 300));
+    return { success: true };
+  }
+
+  try {
+    if (import.meta.env.VITE_DEBUG === 'true') {
+      console.debug('[Delete Payment Request]', { paymentId });
+    }
+
+    await fetchJSON(`/payments/${paymentId}`, { method: 'DELETE' });
+
+    if (import.meta.env.VITE_DEBUG === 'true') {
+      console.debug('[Delete Payment Success]', { paymentId });
+    }
+
+    return { success: true };
+  } catch (error) {
+    console.error('[Delete Payment Error]', error);
+    throw error;
+  }
+}
+
 
 export async function getDashboardData(params: any) {
   if (USE_MOCK) {

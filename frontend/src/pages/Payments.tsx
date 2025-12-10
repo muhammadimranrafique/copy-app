@@ -1,15 +1,16 @@
 import { useState } from 'react';
-import { Plus, DollarSign, Download, Banknote, CreditCard, Receipt, Smartphone, Building2, User, School } from 'lucide-react';
+import { Plus, DollarSign, Download, Banknote, CreditCard, Receipt, Smartphone, Building2, User, School, Pencil, Trash2 } from 'lucide-react';
 import { api } from '@/lib/api-client';
 import { useEffect } from 'react';
 import { useCurrency } from '@/hooks/useCurrency';
 import { useAuth } from '@/lib/useAuth';
-import { getPayments, createPayment, getLeaders, downloadPaymentReceipt } from '@/lib/mock-api';
+import { getPayments, createPayment, getLeaders, downloadPaymentReceipt, updatePayment, deletePayment } from '@/lib/mock-api';
 import { useAuthenticatedQuery } from '@/hooks/useAuthenticatedQuery';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Card, CardContent } from '@/components/ui/card';
-import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog';
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger, DialogFooter } from '@/components/ui/dialog';
+import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from '@/components/ui/alert-dialog';
 import { Label } from '@/components/ui/label';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { toast } from 'sonner';
@@ -45,6 +46,22 @@ export default function Payments() {
   });
   const [leaderOrders, setLeaderOrders] = useState<any[]>([]);
   const [loadingOrders, setLoadingOrders] = useState(false);
+
+  // Edit payment state
+  const [editingPayment, setEditingPayment] = useState<any | null>(null);
+  const [editDialogOpen, setEditDialogOpen] = useState(false);
+  const [editFormData, setEditFormData] = useState({
+    amount: 0,
+    method: 'Cash',
+    paymentDate: '',
+    referenceNumber: ''
+  });
+  const [editLoading, setEditLoading] = useState(false);
+
+  // Delete payment state
+  const [deletingPayment, setDeletingPayment] = useState<any | null>(null);
+  const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
+  const [deleteLoading, setDeleteLoading] = useState(false);
 
   useEffect(() => {
     if (formData.leaderId) {
@@ -185,6 +202,68 @@ export default function Payments() {
     } catch (error: any) {
       console.error('Receipt download error:', error);
       toast.error(error?.message || 'Failed to download receipt', { id: 'download-receipt' });
+    }
+  };
+
+  const handleEditClick = (payment: any) => {
+    setEditingPayment(payment);
+    setEditFormData({
+      amount: payment.amount,
+      method: payment.method,
+      paymentDate: payment.paymentDate ? new Date(payment.paymentDate).toISOString().split('T')[0] : '',
+      referenceNumber: payment.referenceNumber || ''
+    });
+    setEditDialogOpen(true);
+  };
+
+  const handleEditSubmit = async () => {
+    if (!editingPayment) return;
+
+    // Validation
+    if (editFormData.amount <= 0) {
+      toast.error('Payment amount must be greater than 0');
+      return;
+    }
+
+    try {
+      setEditLoading(true);
+      await updatePayment(editingPayment.id, editFormData);
+      toast.success('Payment updated successfully');
+      setEditDialogOpen(false);
+      setEditingPayment(null);
+
+      // Refresh payments list
+      await refetchPayments();
+    } catch (error: any) {
+      console.error('Error updating payment:', error);
+      toast.error(error?.message || 'Failed to update payment');
+    } finally {
+      setEditLoading(false);
+    }
+  };
+
+  const handleDeleteClick = (payment: any) => {
+    setDeletingPayment(payment);
+    setDeleteDialogOpen(true);
+  };
+
+  const handleDeleteConfirm = async () => {
+    if (!deletingPayment) return;
+
+    try {
+      setDeleteLoading(true);
+      await deletePayment(deletingPayment.id);
+      toast.success('Payment deleted successfully');
+      setDeleteDialogOpen(false);
+      setDeletingPayment(null);
+
+      // Refresh payments list
+      await refetchPayments();
+    } catch (error: any) {
+      console.error('Error deleting payment:', error);
+      toast.error(error?.message || 'Failed to delete payment');
+    } finally {
+      setDeleteLoading(false);
     }
   };
 
@@ -473,15 +552,35 @@ export default function Payments() {
                           Payment Amount
                         </p>
                       </div>
-                      <Button
-                        variant="outline"
-                        size="sm"
-                        onClick={() => handleDownloadReceipt(payment.id)}
-                        className="flex items-center gap-2 hover:bg-green-50 hover:border-green-300"
-                      >
-                        <Download className="w-4 h-4" />
-                        <span className="hidden sm:inline">Receipt</span>
-                      </Button>
+                      <div className="flex flex-col gap-2">
+                        <Button
+                          variant="outline"
+                          size="sm"
+                          onClick={() => handleEditClick(payment)}
+                          className="flex items-center gap-2 hover:bg-blue-50 hover:border-blue-300"
+                        >
+                          <Pencil className="w-3 h-3" />
+                          <span className="hidden sm:inline">Edit</span>
+                        </Button>
+                        <Button
+                          variant="outline"
+                          size="sm"
+                          onClick={() => handleDeleteClick(payment)}
+                          className="flex items-center gap-2 hover:bg-red-50 hover:border-red-300 text-red-600"
+                        >
+                          <Trash2 className="w-3 h-3" />
+                          <span className="hidden sm:inline">Delete</span>
+                        </Button>
+                        <Button
+                          variant="outline"
+                          size="sm"
+                          onClick={() => handleDownloadReceipt(payment.id)}
+                          className="flex items-center gap-2 hover:bg-green-50 hover:border-green-300"
+                        >
+                          <Download className="w-4 h-4" />
+                          <span className="hidden sm:inline">Receipt</span>
+                        </Button>
+                      </div>
                     </div>
                   </div>
                 </CardContent>
@@ -497,6 +596,156 @@ export default function Payments() {
           <p className="text-muted-foreground">No payments recorded yet</p>
         </div>
       )}
+
+      {/* Edit Payment Dialog */}
+      <Dialog open={editDialogOpen} onOpenChange={setEditDialogOpen}>
+        <DialogContent className="max-w-md">
+          <DialogHeader>
+            <DialogTitle>Edit Payment</DialogTitle>
+          </DialogHeader>
+
+          {editingPayment && (
+            <div className="space-y-4">
+              {/* Amount Field */}
+              <div>
+                <Label htmlFor="edit-amount">Payment Amount (Rs) *</Label>
+                <div className="relative">
+                  <span className="absolute left-3 top-1/2 transform -translate-y-1/2 text-muted-foreground text-sm">
+                    Rs
+                  </span>
+                  <Input
+                    id="edit-amount"
+                    type="number"
+                    step="0.01"
+                    className="pl-8"
+                    value={editFormData.amount}
+                    onChange={(e) => setEditFormData({ ...editFormData, amount: parseFloat(e.target.value) || 0 })}
+                    placeholder="0.00"
+                    required
+                  />
+                </div>
+              </div>
+
+              {/* Payment Method */}
+              <div>
+                <Label htmlFor="edit-method">Payment Method</Label>
+                <Select value={editFormData.method} onValueChange={(value) => setEditFormData({ ...editFormData, method: value })}>
+                  <SelectTrigger>
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="Cash">Cash</SelectItem>
+                    <SelectItem value="Bank Transfer">Bank Transfer</SelectItem>
+                    <SelectItem value="Cheque">Cheque</SelectItem>
+                    <SelectItem value="UPI">UPI</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
+
+              {/* Payment Date */}
+              <div>
+                <Label htmlFor="edit-date">Payment Date *</Label>
+                <Input
+                  id="edit-date"
+                  type="date"
+                  value={editFormData.paymentDate}
+                  onChange={(e) => setEditFormData({ ...editFormData, paymentDate: e.target.value })}
+                  required
+                />
+              </div>
+
+              {/* Reference Number */}
+              <div>
+                <Label htmlFor="edit-reference">Reference Number</Label>
+                <Input
+                  id="edit-reference"
+                  value={editFormData.referenceNumber}
+                  onChange={(e) => setEditFormData({ ...editFormData, referenceNumber: e.target.value })}
+                  placeholder="Optional"
+                />
+              </div>
+            </div>
+          )}
+
+          <DialogFooter>
+            <Button
+              variant="outline"
+              onClick={() => setEditDialogOpen(false)}
+              disabled={editLoading}
+            >
+              Cancel
+            </Button>
+            <Button
+              onClick={handleEditSubmit}
+              disabled={editLoading}
+            >
+              {editLoading ? 'Updating...' : 'Update Payment'}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* Delete Payment Confirmation Dialog */}
+      <AlertDialog open={deleteDialogOpen} onOpenChange={setDeleteDialogOpen}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Delete Payment</AlertDialogTitle>
+            <AlertDialogDescription>
+              {deletingPayment && (
+                <div className="space-y-3 mt-2">
+                  <p>Are you sure you want to delete this payment?</p>
+
+                  {/* Payment Details */}
+                  <div className="bg-gray-50 border border-gray-200 rounded-lg p-3">
+                    <div className="space-y-2 text-sm">
+                      <div className="flex justify-between">
+                        <span className="text-gray-600">Amount:</span>
+                        <span className="font-semibold text-gray-900">{formatAmount(deletingPayment.amount)}</span>
+                      </div>
+                      <div className="flex justify-between">
+                        <span className="text-gray-600">Method:</span>
+                        <span className="font-semibold text-gray-900">{deletingPayment.method}</span>
+                      </div>
+                      <div className="flex justify-between">
+                        <span className="text-gray-600">Date:</span>
+                        <span className="font-semibold text-gray-900">
+                          {format(new Date(deletingPayment.paymentDate), 'MMM dd, yyyy')}
+                        </span>
+                      </div>
+                      {deletingPayment.referenceNumber && (
+                        <div className="flex justify-between">
+                          <span className="text-gray-600">Reference:</span>
+                          <span className="font-semibold text-gray-900">{deletingPayment.referenceNumber}</span>
+                        </div>
+                      )}
+                      {deletingPayment.client && (
+                        <div className="flex justify-between">
+                          <span className="text-gray-600">Client:</span>
+                          <span className="font-semibold text-gray-900">{deletingPayment.client.name}</span>
+                        </div>
+                      )}
+                    </div>
+                  </div>
+
+                  <p className="text-sm text-red-600 font-medium">
+                    This action cannot be undone.
+                  </p>
+                </div>
+              )}
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel disabled={deleteLoading}>Cancel</AlertDialogCancel>
+            <AlertDialogAction
+              onClick={handleDeleteConfirm}
+              disabled={deleteLoading}
+              className="bg-red-600 hover:bg-red-700"
+            >
+              {deleteLoading ? 'Deleting...' : 'Delete Payment'}
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </div>
   );
 }

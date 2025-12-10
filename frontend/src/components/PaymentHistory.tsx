@@ -1,10 +1,16 @@
 import { useState, useEffect } from 'react';
-import { Download, Calendar, CreditCard, Receipt, TrendingDown } from 'lucide-react';
+import { Download, Calendar, CreditCard, Receipt, TrendingDown, Pencil, Trash2 } from 'lucide-react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from '@/components/ui/dialog';
+import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from '@/components/ui/alert-dialog';
+import { Input } from '@/components/ui/input';
+import { Label } from '@/components/ui/label';
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { format } from 'date-fns';
 import { toast } from 'sonner';
+import { updatePayment, deletePayment } from '@/lib/mock-api';
 
 interface Payment {
     id: string;
@@ -20,11 +26,28 @@ interface PaymentHistoryProps {
     orderTotal: number;
     currentBalance: number;
     onDownloadReceipt?: (paymentId: string) => void;
+    onPaymentUpdated?: () => void; // Callback to refresh parent component
 }
 
-export function PaymentHistory({ orderId, orderTotal, currentBalance, onDownloadReceipt }: PaymentHistoryProps) {
+export function PaymentHistory({ orderId, orderTotal, currentBalance, onDownloadReceipt, onPaymentUpdated }: PaymentHistoryProps) {
     const [payments, setPayments] = useState<Payment[]>([]);
     const [loading, setLoading] = useState(true);
+
+    // Edit payment state
+    const [editingPayment, setEditingPayment] = useState<Payment | null>(null);
+    const [editDialogOpen, setEditDialogOpen] = useState(false);
+    const [editFormData, setEditFormData] = useState({
+        amount: 0,
+        method: 'Cash',
+        paymentDate: '',
+        referenceNumber: ''
+    });
+    const [editLoading, setEditLoading] = useState(false);
+
+    // Delete payment state
+    const [deletingPayment, setDeletingPayment] = useState<Payment | null>(null);
+    const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
+    const [deleteLoading, setDeleteLoading] = useState(false);
 
     useEffect(() => {
         fetchPaymentHistory();
@@ -111,6 +134,89 @@ export function PaymentHistory({ orderId, orderTotal, currentBalance, onDownload
             }
         }
     };
+
+    const handleEditClick = (payment: Payment) => {
+        setEditingPayment(payment);
+        setEditFormData({
+            amount: payment.amount,
+            method: payment.method,
+            paymentDate: payment.paymentDate ? new Date(payment.paymentDate).toISOString().split('T')[0] : '',
+            referenceNumber: payment.referenceNumber || ''
+        });
+        setEditDialogOpen(true);
+    };
+
+    const handleEditSubmit = async () => {
+        if (!editingPayment) return;
+
+        // Validation
+        if (editFormData.amount <= 0) {
+            toast.error('Payment amount must be greater than 0');
+            return;
+        }
+
+        // Calculate what the new total paid would be if this edit goes through
+        const amountDifference = editFormData.amount - editingPayment.amount;
+        const currentTotalPaid = payments.reduce((sum, p) => sum + p.amount, 0);
+        const newTotalPaid = currentTotalPaid + amountDifference;
+
+        // Check for overpayment
+        if (newTotalPaid > orderTotal) {
+            toast.error(`Payment update would cause overpayment. Order total: Rs ${orderTotal.toLocaleString()}, Would result in total paid: Rs ${newTotalPaid.toLocaleString()} (exceeds by Rs ${(newTotalPaid - orderTotal).toLocaleString()})`);
+            return;
+        }
+
+        try {
+            setEditLoading(true);
+            await updatePayment(editingPayment.id, editFormData);
+            toast.success('Payment updated successfully');
+            setEditDialogOpen(false);
+            setEditingPayment(null);
+
+            // Refresh payment history
+            await fetchPaymentHistory();
+
+            // Notify parent component to refresh
+            if (onPaymentUpdated) {
+                onPaymentUpdated();
+            }
+        } catch (error: any) {
+            console.error('Error updating payment:', error);
+            toast.error(error?.message || 'Failed to update payment');
+        } finally {
+            setEditLoading(false);
+        }
+    };
+
+    const handleDeleteClick = (payment: Payment) => {
+        setDeletingPayment(payment);
+        setDeleteDialogOpen(true);
+    };
+
+    const handleDeleteConfirm = async () => {
+        if (!deletingPayment) return;
+
+        try {
+            setDeleteLoading(true);
+            await deletePayment(deletingPayment.id);
+            toast.success('Payment deleted successfully');
+            setDeleteDialogOpen(false);
+            setDeletingPayment(null);
+
+            // Refresh payment history
+            await fetchPaymentHistory();
+
+            // Notify parent component to refresh
+            if (onPaymentUpdated) {
+                onPaymentUpdated();
+            }
+        } catch (error: any) {
+            console.error('Error deleting payment:', error);
+            toast.error(error?.message || 'Failed to delete payment');
+        } finally {
+            setDeleteLoading(false);
+        }
+    }
 
     const getMethodIcon = (method: string) => {
         const icons: Record<string, JSX.Element> = {
@@ -261,15 +367,35 @@ export function PaymentHistory({ orderId, orderTotal, currentBalance, onDownload
                                                 <p className="text-2xl font-bold text-green-600">
                                                     Rs {payment.amount.toLocaleString()}
                                                 </p>
-                                                <Button
-                                                    variant="outline"
-                                                    size="sm"
-                                                    onClick={() => handleDownloadReceipt(payment.id)}
-                                                    className="mt-2"
-                                                >
-                                                    <Download className="w-3 h-3 mr-1" />
-                                                    Receipt
-                                                </Button>
+                                                <div className="flex gap-2 mt-2">
+                                                    <Button
+                                                        variant="outline"
+                                                        size="sm"
+                                                        onClick={() => handleEditClick(payment)}
+                                                        className="hover:bg-blue-50 hover:border-blue-300"
+                                                    >
+                                                        <Pencil className="w-3 h-3 mr-1" />
+                                                        Edit
+                                                    </Button>
+                                                    <Button
+                                                        variant="outline"
+                                                        size="sm"
+                                                        onClick={() => handleDeleteClick(payment)}
+                                                        className="hover:bg-red-50 hover:border-red-300 text-red-600"
+                                                    >
+                                                        <Trash2 className="w-3 h-3 mr-1" />
+                                                        Delete
+                                                    </Button>
+                                                    <Button
+                                                        variant="outline"
+                                                        size="sm"
+                                                        onClick={() => handleDownloadReceipt(payment.id)}
+                                                        className="hover:bg-green-50 hover:border-green-300"
+                                                    >
+                                                        <Download className="w-3 h-3 mr-1" />
+                                                        Receipt
+                                                    </Button>
+                                                </div>
                                             </div>
                                         </div>
 
@@ -295,6 +421,202 @@ export function PaymentHistory({ orderId, orderTotal, currentBalance, onDownload
                     })}
                 </div>
             </CardContent>
+
+            {/* Edit Payment Dialog */}
+            <Dialog open={editDialogOpen} onOpenChange={setEditDialogOpen}>
+                <DialogContent className="max-w-md">
+                    <DialogHeader>
+                        <DialogTitle>Edit Payment</DialogTitle>
+                    </DialogHeader>
+
+                    {editingPayment && (
+                        <div className="space-y-4">
+                            {/* Order Details */}
+                            <div className="bg-blue-50 border border-blue-200 rounded-lg p-3">
+                                <p className="text-sm font-medium text-blue-900 mb-2">Order Details</p>
+                                <div className="grid grid-cols-2 gap-2 text-sm">
+                                    <div>
+                                        <p className="text-blue-600">Total Amount</p>
+                                        <p className="font-semibold text-blue-900">Rs {orderTotal.toLocaleString()}</p>
+                                    </div>
+                                    <div>
+                                        <p className="text-blue-600">Current Balance</p>
+                                        <p className="font-semibold text-blue-900">Rs {currentBalance.toLocaleString()}</p>
+                                    </div>
+                                </div>
+                            </div>
+
+                            {/* Amount Field */}
+                            <div>
+                                <Label htmlFor="edit-amount">Payment Amount (Rs) *</Label>
+                                <div className="relative">
+                                    <span className="absolute left-3 top-1/2 transform -translate-y-1/2 text-muted-foreground text-sm">
+                                        Rs
+                                    </span>
+                                    <Input
+                                        id="edit-amount"
+                                        type="number"
+                                        step="0.01"
+                                        className="pl-8"
+                                        value={editFormData.amount}
+                                        onChange={(e) => setEditFormData({ ...editFormData, amount: parseFloat(e.target.value) || 0 })}
+                                        placeholder="0.00"
+                                        required
+                                    />
+                                </div>
+                            </div>
+
+                            {/* Payment Method */}
+                            <div>
+                                <Label htmlFor="edit-method">Payment Method</Label>
+                                <Select value={editFormData.method} onValueChange={(value) => setEditFormData({ ...editFormData, method: value })}>
+                                    <SelectTrigger>
+                                        <SelectValue />
+                                    </SelectTrigger>
+                                    <SelectContent>
+                                        <SelectItem value="Cash">Cash</SelectItem>
+                                        <SelectItem value="Bank Transfer">Bank Transfer</SelectItem>
+                                        <SelectItem value="Cheque">Cheque</SelectItem>
+                                        <SelectItem value="UPI">UPI</SelectItem>
+                                    </SelectContent>
+                                </Select>
+                            </div>
+
+                            {/* Payment Date */}
+                            <div>
+                                <Label htmlFor="edit-date">Payment Date *</Label>
+                                <Input
+                                    id="edit-date"
+                                    type="date"
+                                    value={editFormData.paymentDate}
+                                    onChange={(e) => setEditFormData({ ...editFormData, paymentDate: e.target.value })}
+                                    required
+                                />
+                            </div>
+
+                            {/* Reference Number */}
+                            <div>
+                                <Label htmlFor="edit-reference">Reference Number</Label>
+                                <Input
+                                    id="edit-reference"
+                                    value={editFormData.referenceNumber}
+                                    onChange={(e) => setEditFormData({ ...editFormData, referenceNumber: e.target.value })}
+                                    placeholder="Optional"
+                                />
+                            </div>
+
+                            {/* Preview of changes */}
+                            {editFormData.amount !== editingPayment.amount && (
+                                <div className={`rounded-lg p-3 border ${(payments.reduce((sum, p) => sum + p.amount, 0) - editingPayment.amount + editFormData.amount) > orderTotal
+                                        ? 'bg-red-50 border-red-200'
+                                        : 'bg-green-50 border-green-200'
+                                    }`}>
+                                    <p className={`text-xs font-medium mb-1 ${(payments.reduce((sum, p) => sum + p.amount, 0) - editingPayment.amount + editFormData.amount) > orderTotal
+                                            ? 'text-red-700'
+                                            : 'text-green-700'
+                                        }`}>
+                                        {(payments.reduce((sum, p) => sum + p.amount, 0) - editingPayment.amount + editFormData.amount) > orderTotal
+                                            ? '⚠️ Warning: Would cause overpayment'
+                                            : '✓ New balance after update'
+                                        }
+                                    </p>
+                                    <p className={`text-sm font-semibold ${(payments.reduce((sum, p) => sum + p.amount, 0) - editingPayment.amount + editFormData.amount) > orderTotal
+                                            ? 'text-red-900'
+                                            : 'text-green-900'
+                                        }`}>
+                                        Rs {(orderTotal - (payments.reduce((sum, p) => sum + p.amount, 0) - editingPayment.amount + editFormData.amount)).toLocaleString()}
+                                    </p>
+                                </div>
+                            )}
+                        </div>
+                    )}
+
+                    <DialogFooter>
+                        <Button
+                            variant="outline"
+                            onClick={() => setEditDialogOpen(false)}
+                            disabled={editLoading}
+                        >
+                            Cancel
+                        </Button>
+                        <Button
+                            onClick={handleEditSubmit}
+                            disabled={editLoading}
+                        >
+                            {editLoading ? 'Updating...' : 'Update Payment'}
+                        </Button>
+                    </DialogFooter>
+                </DialogContent>
+            </Dialog>
+
+            {/* Delete Payment Confirmation Dialog */}
+            <AlertDialog open={deleteDialogOpen} onOpenChange={setDeleteDialogOpen}>
+                <AlertDialogContent>
+                    <AlertDialogHeader>
+                        <AlertDialogTitle>Delete Payment</AlertDialogTitle>
+                        <AlertDialogDescription>
+                            {deletingPayment && (
+                                <div className="space-y-3 mt-2">
+                                    <p>Are you sure you want to delete this payment?</p>
+
+                                    {/* Payment Details */}
+                                    <div className="bg-gray-50 border border-gray-200 rounded-lg p-3">
+                                        <div className="space-y-2 text-sm">
+                                            <div className="flex justify-between">
+                                                <span className="text-gray-600">Amount:</span>
+                                                <span className="font-semibold text-gray-900">Rs {deletingPayment.amount.toLocaleString()}</span>
+                                            </div>
+                                            <div className="flex justify-between">
+                                                <span className="text-gray-600">Method:</span>
+                                                <span className="font-semibold text-gray-900">{deletingPayment.method}</span>
+                                            </div>
+                                            <div className="flex justify-between">
+                                                <span className="text-gray-600">Date:</span>
+                                                <span className="font-semibold text-gray-900">
+                                                    {format(new Date(deletingPayment.paymentDate), 'MMM dd, yyyy')}
+                                                </span>
+                                            </div>
+                                            {deletingPayment.referenceNumber && (
+                                                <div className="flex justify-between">
+                                                    <span className="text-gray-600">Reference:</span>
+                                                    <span className="font-semibold text-gray-900">{deletingPayment.referenceNumber}</span>
+                                                </div>
+                                            )}
+                                        </div>
+                                    </div>
+
+                                    {/* Impact Preview */}
+                                    <div className="bg-orange-50 border border-orange-200 rounded-lg p-3">
+                                        <p className="text-xs font-medium text-orange-700 mb-1">Impact on Order Balance:</p>
+                                        <div className="flex justify-between items-center text-sm">
+                                            <span className="text-orange-600">Current Balance:</span>
+                                            <span className="font-semibold text-orange-900">Rs {currentBalance.toLocaleString()}</span>
+                                        </div>
+                                        <div className="flex justify-between items-center text-sm mt-1">
+                                            <span className="text-orange-600">New Balance:</span>
+                                            <span className="font-bold text-orange-900">Rs {(currentBalance + deletingPayment.amount).toLocaleString()}</span>
+                                        </div>
+                                    </div>
+
+                                    <p className="text-sm text-red-600 font-medium">
+                                        This action cannot be undone.
+                                    </p>
+                                </div>
+                            )}
+                        </AlertDialogDescription>
+                    </AlertDialogHeader>
+                    <AlertDialogFooter>
+                        <AlertDialogCancel disabled={deleteLoading}>Cancel</AlertDialogCancel>
+                        <AlertDialogAction
+                            onClick={handleDeleteConfirm}
+                            disabled={deleteLoading}
+                            className="bg-red-600 hover:bg-red-700"
+                        >
+                            {deleteLoading ? 'Deleting...' : 'Delete Payment'}
+                        </AlertDialogAction>
+                    </AlertDialogFooter>
+                </AlertDialogContent>
+            </AlertDialog>
         </Card>
     );
 }

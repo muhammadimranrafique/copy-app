@@ -1,14 +1,15 @@
 import { useState } from 'react';
-import { Plus, ShoppingCart, Receipt, DollarSign, Eye, Download } from 'lucide-react';
+import { Plus, ShoppingCart, Receipt, DollarSign, Eye, Download, Edit2, Trash2 } from 'lucide-react';
 import { PaymentHistory } from '@/components/PaymentHistory';
 import { useCurrency } from '@/hooks/useCurrency';
 import { useAuth } from '@/lib/useAuth';
-import { getOrders, createOrder, getLeaders } from '@/lib/mock-api';
+import { getOrders, createOrder, getLeaders, updateOrder, deleteOrder, getOrderPaymentSummary } from '@/lib/mock-api';
 import { useAuthenticatedQuery } from '@/hooks/useAuthenticatedQuery';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Card, CardContent } from '@/components/ui/card';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog';
+import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from '@/components/ui/alert-dialog';
 import { Label } from '@/components/ui/label';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Textarea } from '@/components/ui/textarea';
@@ -28,6 +29,7 @@ interface Order {
   paidAmount?: number;
   balance?: number;
   details?: string;
+  orderCategory?: string;
 }
 
 interface Leader {
@@ -42,6 +44,12 @@ export default function Orders() {
   const [dialogOpen, setDialogOpen] = useState(false);
   const [selectedOrderId, setSelectedOrderId] = useState<string | null>(null);
   const [paymentHistoryOpen, setPaymentHistoryOpen] = useState(false);
+  const [editDialogOpen, setEditDialogOpen] = useState(false);
+  const [editingOrder, setEditingOrder] = useState<Order | null>(null);
+  const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
+  const [deletingOrder, setDeletingOrder] = useState<Order | null>(null);
+  const [deletePaymentInfo, setDeletePaymentInfo] = useState<{ count: number, total: number } | null>(null);
+  const [isProcessing, setIsProcessing] = useState(false);
   const [formData, setFormData] = useState({
     orderNumber: '',
     leaderId: '',
@@ -51,7 +59,17 @@ export default function Orders() {
     initialPayment: 0,
     paymentMode: 'Cash',
     paymentDate: new Date().toISOString().split('T')[0],
-    details: ''
+    details: '',
+    orderCategory: 'Standard Order'
+  });
+  const [editFormData, setEditFormData] = useState({
+    orderNumber: '',
+    leaderId: '',
+    orderDate: '',
+    totalAmount: 0,
+    status: 'Pending',
+    details: '',
+    orderCategory: 'Standard Order'
   });
 
   const {
@@ -122,7 +140,8 @@ export default function Orders() {
         initialPayment: 0,
         paymentMode: 'Cash',
         paymentDate: new Date().toISOString().split('T')[0],
-        details: ''
+        details: '',
+        orderCategory: 'Standard Order'
       });
       loadOrders();
     } catch (error: any) {
@@ -177,6 +196,95 @@ export default function Orders() {
   const handleViewPaymentHistory = (orderId: string) => {
     setSelectedOrderId(orderId);
     setPaymentHistoryOpen(true);
+  };
+
+  const handleEditOrder = (order: Order) => {
+    setEditingOrder(order);
+    setEditFormData({
+      orderNumber: order.orderNumber,
+      leaderId: order.leaderId,
+      orderDate: order.orderDate ? new Date(order.orderDate).toISOString().split('T')[0] : '',
+      totalAmount: order.totalAmount,
+      status: order.status,
+      details: order.details || '',
+      orderCategory: order.orderCategory || 'Standard Order'
+    });
+    setEditDialogOpen(true);
+  };
+
+  const handleUpdateOrder = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!editingOrder) return;
+
+    // Validation
+    if (!editFormData.orderNumber.trim()) {
+      toast.error('Please enter an order number');
+      return;
+    }
+
+    if (!editFormData.leaderId) {
+      toast.error('Please select a leader');
+      return;
+    }
+
+    if (editFormData.totalAmount <= 0) {
+      toast.error('Total amount must be greater than 0');
+      return;
+    }
+
+    // Check if total amount is less than paid amount
+    if (editFormData.totalAmount < (editingOrder.paidAmount || 0)) {
+      toast.error(`Total amount (${formatCurrency(editFormData.totalAmount)}) cannot be less than already paid amount (${formatCurrency(editingOrder.paidAmount || 0)})`);
+      return;
+    }
+
+    setIsProcessing(true);
+    try {
+      await updateOrder(editingOrder.id, editFormData);
+      toast.success('Order updated successfully');
+      setEditDialogOpen(false);
+      setEditingOrder(null);
+      loadOrders();
+    } catch (error: any) {
+      console.error('Order update error:', error);
+      toast.error(error?.message || 'Failed to update order');
+    } finally {
+      setIsProcessing(false);
+    }
+  };
+
+  const handleDeleteClick = async (order: Order) => {
+    setDeletingOrder(order);
+
+    // Fetch payment summary
+    try {
+      const summary = await getOrderPaymentSummary(order.id);
+      setDeletePaymentInfo(summary);
+    } catch (error) {
+      console.error('Failed to fetch payment summary:', error);
+      setDeletePaymentInfo(null);
+    }
+
+    setDeleteDialogOpen(true);
+  };
+
+  const handleConfirmDelete = async () => {
+    if (!deletingOrder) return;
+
+    setIsProcessing(true);
+    try {
+      await deleteOrder(deletingOrder.id);
+      toast.success('Order deleted successfully');
+      setDeleteDialogOpen(false);
+      setDeletingOrder(null);
+      setDeletePaymentInfo(null);
+      loadOrders();
+    } catch (error: any) {
+      console.error('Order deletion error:', error);
+      toast.error(error?.message || 'Failed to delete order');
+    } finally {
+      setIsProcessing(false);
+    }
   };
 
   return (
@@ -243,6 +351,21 @@ export default function Orders() {
                   onChange={(e) => setFormData({ ...formData, totalAmount: parseFloat(e.target.value) || 0 })}
                   required
                 />
+              </div>
+              <div>
+                <Label htmlFor="orderCategory">Order Category</Label>
+                <Select value={formData.orderCategory} onValueChange={(value) => setFormData({ ...formData, orderCategory: value })}>
+                  <SelectTrigger>
+                    <SelectValue placeholder="Select order category" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="Bleach Card Umer">Bleach Card Umer</SelectItem>
+                    <SelectItem value="Other Bleach Card">Other Bleach Card</SelectItem>
+                    <SelectItem value="Standard Order">Standard Order</SelectItem>
+                    <SelectItem value="Custom Order">Custom Order</SelectItem>
+                    <SelectItem value="Bulk Order">Bulk Order</SelectItem>
+                  </SelectContent>
+                </Select>
               </div>
               <div>
                 <Label htmlFor="status">Status</Label>
@@ -407,6 +530,13 @@ export default function Orders() {
                         <p className="text-xs sm:text-sm text-muted-foreground mt-1 truncate">
                           Leader: {order.leaderName || 'N/A'}
                         </p>
+                        {order.orderCategory && order.orderCategory !== 'Standard Order' && (
+                          <p className="text-xs text-muted-foreground mt-1">
+                            <span className="inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium bg-indigo-100 text-indigo-800">
+                              {order.orderCategory}
+                            </span>
+                          </p>
+                        )}
                       </div>
                     </div>
                     <Badge variant={getStatusColor(order.status)} className="text-xs flex-shrink-0 self-start sm:self-center">
@@ -463,6 +593,16 @@ export default function Orders() {
                     <Button
                       variant="outline"
                       size="sm"
+                      onClick={() => handleEditOrder(order)}
+                      className="flex items-center gap-1"
+                      disabled={isProcessing}
+                    >
+                      <Edit2 className="w-3 h-3" />
+                      <span className="hidden sm:inline">Edit</span>
+                    </Button>
+                    <Button
+                      variant="outline"
+                      size="sm"
                       onClick={() => handleViewPaymentHistory(order.id)}
                       className="flex items-center gap-1"
                     >
@@ -477,6 +617,16 @@ export default function Orders() {
                     >
                       <Download className="w-3 h-3" />
                       <span className="hidden sm:inline">Download</span> Invoice
+                    </Button>
+                    <Button
+                      variant="destructive"
+                      size="sm"
+                      onClick={() => handleDeleteClick(order)}
+                      className="flex items-center gap-1"
+                      disabled={isProcessing}
+                    >
+                      <Trash2 className="w-3 h-3" />
+                      <span className="hidden sm:inline">Delete</span>
                     </Button>
                     {(order.status === 'Pending' || order.status === 'Partially Paid') && order.balance > 0 && (
                       <Button
@@ -537,6 +687,10 @@ export default function Orders() {
                 orderId={selectedOrderId}
                 orderTotal={selectedOrder.totalAmount}
                 currentBalance={selectedOrder.balance || selectedOrder.totalAmount}
+                onPaymentUpdated={() => {
+                  console.log('[Orders] Payment updated, refreshing orders list');
+                  loadOrders();
+                }}
               />
             );
           })() : (
@@ -546,6 +700,173 @@ export default function Orders() {
           )}
         </DialogContent>
       </Dialog>
+
+      {/* Edit Order Dialog */}
+      <Dialog open={editDialogOpen} onOpenChange={setEditDialogOpen}>
+        <DialogContent className="max-w-[95vw] sm:max-w-[425px] max-h-[90vh] overflow-y-auto">
+          <DialogHeader>
+            <DialogTitle>Edit Order</DialogTitle>
+          </DialogHeader>
+          <form onSubmit={handleUpdateOrder} className="space-y-4">
+            <div>
+              <Label htmlFor="edit-orderNumber">Order Number *</Label>
+              <Input
+                id="edit-orderNumber"
+                value={editFormData.orderNumber}
+                disabled
+                className="bg-muted"
+              />
+              <p className="text-xs text-muted-foreground mt-1">Order number cannot be changed</p>
+            </div>
+            <div>
+              <Label htmlFor="edit-leader">Leader *</Label>
+              <Select value={editFormData.leaderId} onValueChange={(value) => setEditFormData({ ...editFormData, leaderId: value })}>
+                <SelectTrigger>
+                  <SelectValue placeholder="Select a leader" />
+                </SelectTrigger>
+                <SelectContent>
+                  {leaders.map((leader) => (
+                    <SelectItem key={leader.id} value={leader.id}>
+                      {leader.name} ({leader.type})
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+            <div>
+              <Label htmlFor="edit-orderDate">Order Date *</Label>
+              <Input
+                id="edit-orderDate"
+                type="date"
+                value={editFormData.orderDate}
+                onChange={(e) => setEditFormData({ ...editFormData, orderDate: e.target.value })}
+                required
+              />
+            </div>
+            <div>
+              <Label htmlFor="edit-totalAmount">Total Amount *</Label>
+              <Input
+                id="edit-totalAmount"
+                type="number"
+                step="0.01"
+                value={editFormData.totalAmount}
+                onChange={(e) => setEditFormData({ ...editFormData, totalAmount: parseFloat(e.target.value) || 0 })}
+                required
+              />
+              {editingOrder && editingOrder.paidAmount > 0 && (
+                <p className="text-xs text-muted-foreground mt-1">
+                  Already paid: {formatCurrency(editingOrder.paidAmount || 0)}
+                </p>
+              )}
+            </div>
+            <div>
+              <Label htmlFor="edit-status">Status</Label>
+              <Select value={editFormData.status} onValueChange={(value) => setEditFormData({ ...editFormData, status: value })}>
+                <SelectTrigger>
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="Pending">Pending</SelectItem>
+                  <SelectItem value="In Production">In Production</SelectItem>
+                  <SelectItem value="Delivered">Delivered</SelectItem>
+                  <SelectItem value="Paid">Paid</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
+            <div>
+              <Label htmlFor="edit-orderCategory">Order Category</Label>
+              <Select value={editFormData.orderCategory} onValueChange={(value) => setEditFormData({ ...editFormData, orderCategory: value })}>
+                <SelectTrigger>
+                  <SelectValue placeholder="Select order category" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="Bleach Card Umer">Bleach Card Umer</SelectItem>
+                  <SelectItem value="Other Bleach Card">Other Bleach Card</SelectItem>
+                  <SelectItem value="Standard Order">Standard Order</SelectItem>
+                  <SelectItem value="Custom Order">Custom Order</SelectItem>
+                  <SelectItem value="Bulk Order">Bulk Order</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
+            <div>
+              <Label htmlFor="edit-details">Order Details</Label>
+              <Textarea
+                id="edit-details"
+                value={editFormData.details}
+                onChange={(e) => setEditFormData({ ...editFormData, details: e.target.value })}
+                placeholder="Add any additional notes or details about this order..."
+                rows={3}
+                maxLength={2000}
+                className="resize-none"
+              />
+              {editFormData.details && (
+                <p className="text-xs text-muted-foreground mt-1">
+                  {editFormData.details.length}/2000 characters
+                </p>
+              )}
+            </div>
+            <div className="flex gap-2">
+              <Button type="button" variant="outline" onClick={() => setEditDialogOpen(false)} className="flex-1" disabled={isProcessing}>
+                Cancel
+              </Button>
+              <Button type="submit" className="flex-1" disabled={isProcessing}>
+                {isProcessing ? 'Updating...' : 'Update Order'}
+              </Button>
+            </div>
+          </form>
+        </DialogContent>
+      </Dialog>
+
+      {/* Delete Order Confirmation Dialog */}
+      <AlertDialog open={deleteDialogOpen} onOpenChange={setDeleteDialogOpen}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Delete Order</AlertDialogTitle>
+            <AlertDialogDescription className="space-y-3">
+              <p>Are you sure you want to delete this order? This action cannot be undone.</p>
+
+              {deletingOrder && (
+                <div className="p-3 bg-muted rounded-lg space-y-2">
+                  <div className="flex justify-between text-sm">
+                    <span className="font-medium">Order Number:</span>
+                    <span>{deletingOrder.orderNumber}</span>
+                  </div>
+                  <div className="flex justify-between text-sm">
+                    <span className="font-medium">Total Amount:</span>
+                    <span>{formatCurrency(deletingOrder.totalAmount)}</span>
+                  </div>
+                  <div className="flex justify-between text-sm">
+                    <span className="font-medium">Leader:</span>
+                    <span>{deletingOrder.leaderName}</span>
+                  </div>
+                </div>
+              )}
+
+              {deletePaymentInfo && deletePaymentInfo.count > 0 && (
+                <div className="p-3 bg-destructive/10 border border-destructive/30 rounded-lg">
+                  <p className="text-sm font-semibold text-destructive mb-2">⚠️ Warning: Payment Records</p>
+                  <p className="text-sm text-destructive">
+                    This order has <strong>{deletePaymentInfo.count}</strong> payment(s) totaling <strong>{formatCurrency(deletePaymentInfo.total)}</strong>.
+                  </p>
+                  <p className="text-sm text-destructive mt-1">
+                    Deleting this order will also delete all associated payment records.
+                  </p>
+                </div>
+              )}
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel disabled={isProcessing}>Cancel</AlertDialogCancel>
+            <AlertDialogAction
+              onClick={handleConfirmDelete}
+              className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+              disabled={isProcessing}
+            >
+              {isProcessing ? 'Deleting...' : 'Delete Order'}
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </div>
   );
 }

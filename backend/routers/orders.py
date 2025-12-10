@@ -71,7 +71,8 @@ def get_orders(
                     orderDate=order.order_date,      # Use the frontend field name
                     createdAt=order.created_at,      # Use the frontend field name
                     leaderName=order.client.name if order.client else None,
-                    details=order.details            # Include order details
+                    details=order.details,           # Include order details
+                    orderCategory=order.order_category  # Include order category
                 )
                 response_orders.append(order_data)
             except Exception as e:
@@ -126,6 +127,9 @@ def create_order(
                 detail="Order details cannot exceed 2000 characters"
             )
         
+        # Extract order category
+        order_category = order_dict.pop('orderCategory', 'Standard Order')
+        
         if 'orderNumber' in order_dict:
             order_dict['order_number'] = order_dict.pop('orderNumber')
         if 'leaderId' in order_dict:
@@ -133,9 +137,11 @@ def create_order(
         if 'totalAmount' in order_dict:
             order_dict['total_amount'] = order_dict.pop('totalAmount')
         
-        # Add details to order_dict (already validated above)
+        # Add details and category to order_dict
         if details is not None:
             order_dict['details'] = details
+        if order_category is not None:
+            order_dict['order_category'] = order_category
         
         # Validate initial payment
         initial_payment = float(initial_payment) if initial_payment else 0.0
@@ -243,51 +249,195 @@ def update_order(
     session: Session = Depends(get_session),
     current_user: User = Depends(get_current_user)
 ):
-    """Update an order."""
-    statement = select(Order).where(Order.id == order_id)
-    order = session.exec(statement).first()
-    
-    if not order:
+    """Update an order with validation to ensure data integrity."""
+    try:
+        statement = select(Order).where(Order.id == order_id)
+        order = session.exec(statement).first()
+        
+        if not order:
+            raise HTTPException(
+                status_code=status.HTTP_404_NOT_FOUND,
+                detail="Order not found"
+            )
+        
+        # Convert frontend field names to backend field names
+        order_dict = order_data.dict(exclude_unset=True)
+        
+        # Extract and validate details field
+        details = order_dict.pop('details', None)
+        if details and len(details) > 2000:
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail="Order details cannot exceed 2000 characters"
+            )
+        
+        # Map frontend camelCase to backend snake_case
+        if 'orderNumber' in order_dict:
+            order_dict['order_number'] = order_dict.pop('orderNumber')
+        if 'leaderId' in order_dict:
+            order_dict['client_id'] = order_dict.pop('leaderId')
+        if 'totalAmount' in order_dict:
+            order_dict['total_amount'] = order_dict.pop('totalAmount')
+        
+        # Remove payment-related fields from update (these should not be modified via edit)
+        order_dict.pop('initialPayment', None)
+        order_dict.pop('paymentMode', None)
+        order_dict.pop('paymentDate', None)
+        
+        # Validate total_amount if being updated
+        if 'total_amount' in order_dict:
+            new_total = float(order_dict['total_amount'])
+            current_paid = float(order.paid_amount)
+            
+            if new_total < current_paid:
+                raise HTTPException(
+                    status_code=status.HTTP_400_BAD_REQUEST,
+                    detail=f"Total amount ({new_total:,.2f}) cannot be less than already paid amount ({current_paid:,.2f})"
+                )
+            
+            # Recalculate balance
+            order_dict['balance'] = new_total - current_paid
+            
+            # Update status based on new balance
+            if order_dict['balance'] <= 0:
+                order_dict['status'] = OrderStatus.PAID.value
+            elif current_paid > 0:
+                order_dict['status'] = OrderStatus.PARTIALLY_PAID.value
+        
+        # Verify client exists if being updated
+        if 'client_id' in order_dict:
+            client_statement = select(Client).where(Client.id == order_dict['client_id'])
+            client = session.exec(client_statement).first()
+            
+            if not client:
+                raise HTTPException(
+                    status_code=status.HTTP_404_NOT_FOUND,
+                    detail="Leader/Client not found"
+                )
+        
+        # Update order fields
+        for key, value in order_dict.items():
+            if hasattr(order, key):
+                setattr(order, key, value)
+        
+        # Update details separately if provided
+        if details is not None:
+            order.details = details
+        
+        session.add(order)
+        session.commit()
+        session.refresh(order)
+        
+        return order
+        
+    except HTTPException:
+        raise
+    except Exception as e:
+        session.rollback()
         raise HTTPException(
-            status_code=status.HTTP_404_NOT_FOUND,
-            detail="Order not found"
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail=f"Failed to update order: {str(e)}"
         )
-    
-    # Update fields
-    for key, value in order_data.dict().items():
-        setattr(order, key, value)
-    
-    session.add(order)
-    session.commit()
-    session.refresh(order)
-    
-    return order
+
+@router.get("/{order_id}/payment-summary")
+def get_order_payment_summary(
+    order_id: str,
+    session: Session = Depends(get_session),
+    current_user: User = Depends(get_current_user)
+):
+    """Get payment summary for an order (count and total amount)."""
+    try:
+        # Verify order exists
+        statement = select(Order).where(Order.id == order_id)
+        order = session.exec(statement).first()
+        
+        if not order:
+            raise HTTPException(
+                status_code=status.HTTP_404_NOT_FOUND,
+                detail="Order not found"
+            )
+        
+        # Get payment records
+        oid = UUID(str(order_id)) if isinstance(order_id, str) else order_id
+        payment_statement = select(Payment).where(Payment.order_id == oid)
+        payments = session.exec(payment_statement).all()
+        
+        total_amount = sum(payment.amount for payment in payments)
+        
+        return {
+            "count": len(payments),
+            "total": float(total_amount),
+            "order_number": order.order_number
+        }
+        
+    except HTTPException:
+        raise
+    except Exception as e:
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail=f"Failed to get payment summary: {str(e)}"
+        )
 
 @router.delete("/{order_id}", status_code=status.HTTP_204_NO_CONTENT)
+
 def delete_order(
     order_id: str,
     session: Session = Depends(get_session),
     current_user: User = Depends(get_current_user)
 ):
-    """Delete an order."""
-    if current_user.role not in ["admin", "manager"]:
+    """Delete an order and cascade delete associated payment records."""
+    try:
+        # Check authorization
+        if current_user.role not in ["admin", "manager"]:
+            raise HTTPException(
+                status_code=status.HTTP_403_FORBIDDEN,
+                detail="Only admins and managers can delete orders"
+            )
+        
+        # Find the order
+        statement = select(Order).where(Order.id == order_id)
+        order = session.exec(statement).first()
+        
+        if not order:
+            raise HTTPException(
+                status_code=status.HTTP_404_NOT_FOUND,
+                detail="Order not found"
+            )
+        
+        # Get associated payment records for cascade deletion
+        try:
+            oid = UUID(str(order_id)) if isinstance(order_id, str) else order_id
+            payment_statement = select(Payment).where(Payment.order_id == oid)
+            payments = session.exec(payment_statement).all()
+            
+            # Delete all associated payments first
+            for payment in payments:
+                session.delete(payment)
+            
+            print(f"Deleting order {order.order_number} with {len(payments)} associated payment(s)")
+            
+        except Exception as e:
+            print(f"Error deleting payments: {e}")
+            session.rollback()
+            raise HTTPException(
+                status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+                detail=f"Failed to delete associated payments: {str(e)}"
+            )
+        
+        # Delete the order
+        session.delete(order)
+        session.commit()
+        
+        return None
+        
+    except HTTPException:
+        raise
+    except Exception as e:
+        session.rollback()
         raise HTTPException(
-            status_code=status.HTTP_403_FORBIDDEN,
-            detail="Only admins and managers can delete orders"
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail=f"Failed to delete order: {str(e)}"
         )
-    
-    statement = select(Order).where(Order.id == order_id)
-    order = session.exec(statement).first()
-    
-    if not order:
-        raise HTTPException(
-            status_code=status.HTTP_404_NOT_FOUND,
-            detail="Order not found"
-        )
-    
-    session.delete(order)
-    session.commit()
-    return None
 
 @router.patch("/{order_id}/status")
 def update_order_status(
