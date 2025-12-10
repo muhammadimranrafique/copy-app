@@ -5,7 +5,7 @@ from sqlmodel import Session, select
 from typing import List
 from datetime import datetime
 from database import get_session
-from models import Payment, PaymentCreate, PaymentRead, Order, User, PaymentStatus, PaymentMode, Client, Settings, OrderStatus
+from models import Payment, PaymentCreate, PaymentUpdate, PaymentRead, Order, User, PaymentStatus, PaymentMode, Client, Settings, OrderStatus
 from utils.auth import get_current_user
 from sqlalchemy.orm import joinedload
 from services.payment_receipt_generator import payment_receipt_generator
@@ -303,32 +303,188 @@ def create_payment(
             detail=f"Failed to create payment: {str(e)}"
         )
 
-@router.put("/{payment_id}", response_model=PaymentRead)
+@router.put("/{payment_id}", response_model=PaymentRead, response_model_by_alias=True)
 def update_payment(
     payment_id: str,
-    payment_data: PaymentCreate,
+    payment_data: PaymentUpdate,
     session: Session = Depends(get_session),
     current_user: User = Depends(get_current_user)
 ):
-    """Update a payment."""
-    statement = select(Payment).where(Payment.id == payment_id)
-    payment = session.exec(statement).first()
+    """
+    Update an existing payment with comprehensive validation and order recalculation.
     
-    if not payment:
-        raise HTTPException(
-            status_code=status.HTTP_404_NOT_FOUND,
-            detail="Payment not found"
+    This endpoint:
+    - Validates payment exists
+    - Prevents overpayment (total paid cannot exceed order total)
+    - Recalculates order totals (paid_amount, balance)
+    - Updates order status based on new payment totals
+    - Ensures data consistency with transaction handling
+    """
+    try:
+        print(f"\n[Update Payment] Starting update for payment_id: {payment_id}")
+        print(f"[Update Payment] Update data: {payment_data.dict(exclude_none=True)}")
+        
+        # Fetch the existing payment
+        statement = select(Payment).where(Payment.id == payment_id)
+        payment = session.exec(statement).first()
+        
+        if not payment:
+            raise HTTPException(
+                status_code=status.HTTP_404_NOT_FOUND,
+                detail=f"Payment not found with ID: {payment_id}"
+            )
+        
+        print(f"[Update Payment] Found payment: amount={payment.amount}, order_id={payment.order_id}")
+        
+        # Store old amount for order recalculation
+        old_amount = float(payment.amount)
+        
+        # Get the associated order if payment is linked to one
+        order = None
+        if payment.order_id:
+            order_statement = select(Order).where(Order.id == payment.order_id)
+            order = session.exec(order_statement).first()
+            
+            if not order:
+                raise HTTPException(
+                    status_code=status.HTTP_404_NOT_FOUND,
+                    detail=f"Associated order not found with ID: {payment.order_id}"
+                )
+            
+            print(f"[Update Payment] Found order: {order.order_number}, total={order.total_amount}, paid={order.paid_amount}, balance={order.balance}")
+        
+        # Update payment fields if provided
+        if payment_data.amount is not None:
+            new_amount = float(payment_data.amount)
+            
+            # Validate amount is positive
+            if new_amount <= 0:
+                raise HTTPException(
+                    status_code=status.HTTP_400_BAD_REQUEST,
+                    detail="Payment amount must be a positive number"
+                )
+            
+            # If payment is linked to an order, validate against order balance
+            if order:
+                # Calculate what the new total paid would be
+                amount_difference = new_amount - old_amount
+                new_total_paid = order.paid_amount + amount_difference
+                
+                print(f"[Update Payment] Validation: old_amount={old_amount}, new_amount={new_amount}, difference={amount_difference}")
+                print(f"[Update Payment] Validation: current_paid={order.paid_amount}, new_total_paid={new_total_paid}, order_total={order.total_amount}")
+                
+                # Prevent overpayment
+                if new_total_paid > order.total_amount:
+                    raise HTTPException(
+                        status_code=status.HTTP_400_BAD_REQUEST,
+                        detail=f"Payment update would cause overpayment. Order total: Rs {order.total_amount:,.2f}, Current paid: Rs {order.paid_amount:,.2f}, New payment amount: Rs {new_amount:,.2f}, Would result in total paid: Rs {new_total_paid:,.2f} (exceeds order total by Rs {new_total_paid - order.total_amount:,.2f})"
+                    )
+            
+            payment.amount = new_amount
+            print(f"[Update Payment] Updated amount from {old_amount} to {new_amount}")
+        
+        if payment_data.method is not None:
+            # Handle payment method mapping
+            method_str = payment_data.method.upper().replace(" ", "_")
+            method_mapping = {
+                "CASH": PaymentMode.CASH,
+                "BANK_TRANSFER": PaymentMode.BANK_TRANSFER,
+                "CHEQUE": PaymentMode.CHEQUE,
+                "UPI": PaymentMode.UPI
+            }
+            
+            mode = method_mapping.get(method_str, PaymentMode.CASH)
+            payment.mode = mode
+            print(f"[Update Payment] Updated method to {mode}")
+        
+        if payment_data.paymentDate is not None:
+            # Parse payment date
+            try:
+                payment_date = datetime.fromisoformat(payment_data.paymentDate.split('T')[0])
+                payment.payment_date = payment_date
+                print(f"[Update Payment] Updated payment date to {payment_date}")
+            except (ValueError, AttributeError) as e:
+                print(f"[Update Payment] Date parsing error: {e}, keeping original date")
+        
+        if payment_data.referenceNumber is not None:
+            payment.reference_number = payment_data.referenceNumber
+            print(f"[Update Payment] Updated reference number to {payment_data.referenceNumber}")
+        
+        # Update order totals if payment is linked to an order and amount changed
+        if order and payment_data.amount is not None:
+            amount_difference = float(payment.amount) - old_amount
+            
+            # Update order's paid amount and balance
+            order.paid_amount += amount_difference
+            order.balance = order.total_amount - order.paid_amount
+            
+            print(f"[Update Payment] Updated order totals: paid_amount={order.paid_amount}, balance={order.balance}")
+            
+            # Update order status based on new payment totals
+            if order.balance <= 0:
+                order.status = OrderStatus.PAID
+                print(f"[Update Payment] Order status updated to PAID")
+            elif order.paid_amount > 0:
+                order.status = OrderStatus.PARTIALLY_PAID
+                print(f"[Update Payment] Order status updated to PARTIALLY_PAID")
+            else:
+                order.status = OrderStatus.PENDING
+                print(f"[Update Payment] Order status updated to PENDING")
+            
+            session.add(order)
+        
+        # Save payment changes
+        session.add(payment)
+        session.commit()
+        session.refresh(payment)
+        
+        if order:
+            session.refresh(order)
+        
+        print(f"[Update Payment] ✓ Payment updated successfully")
+        
+        # Fetch client info for response
+        client_statement = select(Client).where(Client.id == payment.client_id)
+        client = session.exec(client_statement).first()
+        
+        client_info = None
+        if client:
+            client_info = {
+                "id": client.id,
+                "name": client.name,
+                "type": client.type.value if hasattr(client.type, 'value') else str(client.type),
+                "contact": client.contact,
+                "address": client.address
+            }
+        
+        # Create PaymentRead response with proper field mapping
+        payment_read = PaymentRead(
+            id=payment.id,
+            amount=payment.amount,
+            method=payment.mode.value if hasattr(payment.mode, 'value') else str(payment.mode),
+            status=payment.status.value if hasattr(payment.status, 'value') else str(payment.status),
+            paymentDate=payment.payment_date,
+            createdAt=payment.created_at,
+            leaderId=payment.client_id,
+            orderId=payment.order_id,
+            referenceNumber=payment.reference_number,
+            client=client_info
         )
-    
-    # Update fields
-    for key, value in payment_data.dict().items():
-        setattr(payment, key, value)
-    
-    session.add(payment)
-    session.commit()
-    session.refresh(payment)
-    
-    return payment
+        
+        return payment_read
+        
+    except HTTPException:
+        session.rollback()
+        raise
+    except Exception as e:
+        session.rollback()
+        print(f"[Update Payment] ERROR: {str(e)}")
+        import traceback
+        traceback.print_exc()
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail=f"Failed to update payment: {str(e)}"
+        )
 
 @router.delete("/{payment_id}", status_code=status.HTTP_204_NO_CONTENT)
 def delete_payment(
@@ -336,25 +492,94 @@ def delete_payment(
     session: Session = Depends(get_session),
     current_user: User = Depends(get_current_user)
 ):
-    """Delete a payment."""
-    if current_user.role != "admin":
+    """
+    Delete a payment and recalculate order totals.
+    
+    This endpoint:
+    - Validates payment exists
+    - Recalculates order totals after deletion (paid_amount, balance)
+    - Updates order status based on new payment totals
+    - Ensures data consistency with transaction handling
+    - Restricted to admin users only
+    """
+    try:
+        print(f"\n[Delete Payment] Starting deletion for payment_id: {payment_id}")
+        
+        # Check admin permission
+        if current_user.role != "admin":
+            raise HTTPException(
+                status_code=status.HTTP_403_FORBIDDEN,
+                detail="Only admins can delete payments"
+            )
+        
+        # Fetch the payment
+        statement = select(Payment).where(Payment.id == payment_id)
+        payment = session.exec(statement).first()
+        
+        if not payment:
+            raise HTTPException(
+                status_code=status.HTTP_404_NOT_FOUND,
+                detail=f"Payment not found with ID: {payment_id}"
+            )
+        
+        print(f"[Delete Payment] Found payment: amount={payment.amount}, order_id={payment.order_id}")
+        
+        # Get the associated order if payment is linked to one
+        order = None
+        if payment.order_id:
+            order_statement = select(Order).where(Order.id == payment.order_id)
+            order = session.exec(order_statement).first()
+            
+            if order:
+                print(f"[Delete Payment] Found order: {order.order_number}, total={order.total_amount}, paid={order.paid_amount}, balance={order.balance}")
+                
+                # Subtract payment amount from order's paid amount
+                order.paid_amount -= payment.amount
+                
+                # Ensure paid_amount doesn't go negative (data integrity)
+                if order.paid_amount < 0:
+                    order.paid_amount = 0
+                
+                # Recalculate balance
+                order.balance = order.total_amount - order.paid_amount
+                
+                print(f"[Delete Payment] Updated order totals: paid_amount={order.paid_amount}, balance={order.balance}")
+                
+                # Update order status based on new payment totals
+                if order.paid_amount == 0:
+                    order.status = OrderStatus.PENDING
+                    print(f"[Delete Payment] Order status updated to PENDING (no payments)")
+                elif order.balance <= 0:
+                    order.status = OrderStatus.PAID
+                    print(f"[Delete Payment] Order status updated to PAID")
+                elif order.paid_amount > 0:
+                    order.status = OrderStatus.PARTIALLY_PAID
+                    print(f"[Delete Payment] Order status updated to PARTIALLY_PAID")
+                
+                session.add(order)
+            else:
+                print(f"[Delete Payment] WARNING: Associated order not found with ID: {payment.order_id}")
+        
+        # Delete the payment
+        session.delete(payment)
+        session.commit()
+        
+        print(f"[Delete Payment] ✓ Payment deleted successfully")
+        
+        return None
+        
+    except HTTPException:
+        session.rollback()
+        raise
+    except Exception as e:
+        session.rollback()
+        print(f"[Delete Payment] ERROR: {str(e)}")
+        import traceback
+        traceback.print_exc()
         raise HTTPException(
-            status_code=status.HTTP_403_FORBIDDEN,
-            detail="Only admins can delete payments"
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail=f"Failed to delete payment: {str(e)}"
         )
-    
-    statement = select(Payment).where(Payment.id == payment_id)
-    payment = session.exec(statement).first()
-    
-    if not payment:
-        raise HTTPException(
-            status_code=status.HTTP_404_NOT_FOUND,
-            detail="Payment not found"
-        )
-    
-    session.delete(payment)
-    session.commit()
-    return None
 
 @router.get("/school/{school_id}")
 def get_payments_by_school(school_id: str, session: Session = Depends(get_session), current_user: User = Depends(get_current_user)):

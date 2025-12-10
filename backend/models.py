@@ -133,6 +133,9 @@ class Order(OrderBase, table=True):
     # Order details/notes
     details: Optional[str] = Field(default=None)
     
+    # Order category
+    order_category: Optional[str] = Field(default="Standard Order")
+    
     # Ensure client relationship is properly loaded
     client: "Client" = Relationship(
         back_populates="orders",
@@ -154,6 +157,8 @@ class OrderCreate(SQLModel):
     paymentDate: Optional[str] = None
     # Order details/notes (optional)
     details: Optional[str] = None
+    # Order category
+    orderCategory: Optional[str] = "Standard Order"
 
 class OrderRead(SQLModel):
     id: UUID
@@ -167,6 +172,7 @@ class OrderRead(SQLModel):
     createdAt: datetime = PydanticField(..., alias="created_at")
     leaderName: Optional[str] = None
     details: Optional[str] = PydanticField(None, alias="details")
+    orderCategory: Optional[str] = PydanticField("Standard Order", alias="order_category")
 
     class Config:
         from_attributes = True
@@ -219,6 +225,23 @@ class PaymentCreate(SQLModel):
                 "paymentDate": "2025-11-03",
                 "referenceNumber": "REF123",
                 "orderId": None
+            }
+        }
+
+class PaymentUpdate(SQLModel):
+    """Model for updating payment records. Does not allow changing orderId or leaderId for data integrity."""
+    amount: Optional[float] = None
+    method: Optional[str] = None
+    paymentDate: Optional[str] = None
+    referenceNumber: Optional[str] = None
+
+    class Config:
+        json_schema_extra = {
+            "example": {
+                "amount": 1500.0,
+                "method": "Cash",
+                "paymentDate": "2025-11-04",
+                "referenceNumber": "REF456"
             }
         }
 
