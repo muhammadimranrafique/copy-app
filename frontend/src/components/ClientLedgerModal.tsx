@@ -50,6 +50,7 @@ interface LedgerData {
         total_outstanding: number;
     };
     orders: Order[];
+    unallocated_payments: Payment[];
 }
 
 export function ClientLedgerModal({ clientId, clientName, open, onOpenChange }: ClientLedgerModalProps) {
@@ -259,6 +260,45 @@ export function ClientLedgerModal({ clientId, clientName, open, onOpenChange }: 
                                 </div>
                             )}
                         </div>
+
+                        {/* Unallocated Payments Section */}
+                        {ledgerData.unallocated_payments && ledgerData.unallocated_payments.length > 0 && (
+                            <div>
+                                <h3 className="text-lg font-semibold mb-3">General Payments</h3>
+                                <Card>
+                                    <CardContent className="p-0">
+                                        <div className="divide-y">
+                                            {ledgerData.unallocated_payments.map((payment) => (
+                                                <div key={payment.id} className="flex items-center justify-between p-4 hover:bg-gray-50">
+                                                    <div className="flex items-center gap-4">
+                                                        <div className="p-2 bg-green-100 rounded-full">
+                                                            <CreditCard className="w-4 h-4 text-green-700" />
+                                                        </div>
+                                                        <div>
+                                                            <p className="font-medium text-sm">
+                                                                {payment.payment_date ? format(new Date(payment.payment_date), 'MMMM dd, yyyy') : 'N/A'}
+                                                            </p>
+                                                            <div className="flex items-center gap-2 mt-1">
+                                                                <Badge variant="outline" className="text-xs">{payment.mode}</Badge>
+                                                                {payment.reference_number && (
+                                                                    <span className="text-xs text-muted-foreground">Ref: {payment.reference_number}</span>
+                                                                )}
+                                                            </div>
+                                                        </div>
+                                                    </div>
+                                                    <div className="text-right">
+                                                        <p className="font-bold text-green-600">
+                                                            {formatCurrency(payment.amount)}
+                                                        </p>
+                                                        <p className="text-xs text-muted-foreground mt-1">Payment Received</p>
+                                                    </div>
+                                                </div>
+                                            ))}
+                                        </div>
+                                    </CardContent>
+                                </Card>
+                            </div>
+                        )}
                     </div>
                 ) : (
                     <div className="text-center py-8 text-muted-foreground">
