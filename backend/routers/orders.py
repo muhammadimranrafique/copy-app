@@ -70,7 +70,8 @@ def get_orders(
                     status=order.status.value if isinstance(order.status, OrderStatus) else str(order.status),
                     orderDate=order.order_date,      # Use the frontend field name
                     createdAt=order.created_at,      # Use the frontend field name
-                    leaderName=order.client.name if order.client else None
+                    leaderName=order.client.name if order.client else None,
+                    details=order.details            # Include order details
                 )
                 response_orders.append(order_data)
             except Exception as e:
@@ -117,12 +118,24 @@ def create_order(
         payment_mode = order_dict.pop('paymentMode', 'Cash')
         payment_date_str = order_dict.pop('paymentDate', None)
         
+        # Extract and validate details field
+        details = order_dict.pop('details', None)
+        if details and len(details) > 2000:
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail="Order details cannot exceed 2000 characters"
+            )
+        
         if 'orderNumber' in order_dict:
             order_dict['order_number'] = order_dict.pop('orderNumber')
         if 'leaderId' in order_dict:
             order_dict['client_id'] = order_dict.pop('leaderId')
         if 'totalAmount' in order_dict:
             order_dict['total_amount'] = order_dict.pop('totalAmount')
+        
+        # Add details to order_dict (already validated above)
+        if details is not None:
+            order_dict['details'] = details
         
         # Validate initial payment
         initial_payment = float(initial_payment) if initial_payment else 0.0

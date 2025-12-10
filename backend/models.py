@@ -30,6 +30,13 @@ class PaymentMode(str, Enum):
 
 class ExpenseCategory(str, Enum):
     PRINTING = "PRINTING"
+    PRINTING_1 = "PRINTING_1"
+    PRINTING_2 = "PRINTING_2"
+    PRINTING_3 = "PRINTING_3"
+    PAPER = "PAPER"
+    PAPER_1 = "PAPER_1"
+    PAPER_2 = "PAPER_2"
+    PAPER_3 = "PAPER_3"
     DELIVERY = "DELIVERY"
     MATERIAL = "MATERIAL"
     STAFF = "STAFF"
@@ -123,6 +130,9 @@ class Order(OrderBase, table=True):
     paid_amount: float = Field(default=0.0)
     balance: float = Field(default=0.0)
     
+    # Order details/notes
+    details: Optional[str] = Field(default=None)
+    
     # Ensure client relationship is properly loaded
     client: "Client" = Relationship(
         back_populates="orders",
@@ -142,6 +152,8 @@ class OrderCreate(SQLModel):
     initialPayment: Optional[float] = 0.0
     paymentMode: Optional[str] = "Cash"
     paymentDate: Optional[str] = None
+    # Order details/notes (optional)
+    details: Optional[str] = None
 
 class OrderRead(SQLModel):
     id: UUID
@@ -154,6 +166,7 @@ class OrderRead(SQLModel):
     orderDate: datetime = PydanticField(..., alias="order_date")
     createdAt: datetime = PydanticField(..., alias="created_at")
     leaderName: Optional[str] = None
+    details: Optional[str] = PydanticField(None, alias="details")
 
     class Config:
         from_attributes = True

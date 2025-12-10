@@ -11,6 +11,7 @@ import { Card, CardContent } from '@/components/ui/card';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog';
 import { Label } from '@/components/ui/label';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
+import { Textarea } from '@/components/ui/textarea';
 import { toast } from 'sonner';
 import { Badge } from '@/components/ui/badge';
 import { format } from 'date-fns';
@@ -24,6 +25,9 @@ interface Order {
   status: string;
   orderDate: string;
   createdAt: string;
+  paidAmount?: number;
+  balance?: number;
+  details?: string;
 }
 
 interface Leader {
@@ -46,7 +50,8 @@ export default function Orders() {
     status: 'Pending',
     initialPayment: 0,
     paymentMode: 'Cash',
-    paymentDate: new Date().toISOString().split('T')[0]
+    paymentDate: new Date().toISOString().split('T')[0],
+    details: ''
   });
 
   const {
@@ -116,7 +121,8 @@ export default function Orders() {
         status: 'Pending',
         initialPayment: 0,
         paymentMode: 'Cash',
-        paymentDate: new Date().toISOString().split('T')[0]
+        paymentDate: new Date().toISOString().split('T')[0],
+        details: ''
       });
       loadOrders();
     } catch (error: any) {
@@ -251,6 +257,23 @@ export default function Orders() {
                     <SelectItem value="Paid">Paid</SelectItem>
                   </SelectContent>
                 </Select>
+              </div>
+              <div>
+                <Label htmlFor="details">Order Details</Label>
+                <Textarea
+                  id="details"
+                  value={formData.details}
+                  onChange={(e) => setFormData({ ...formData, details: e.target.value })}
+                  placeholder="Add any additional notes or details about this order..."
+                  rows={3}
+                  maxLength={2000}
+                  className="resize-none"
+                />
+                {formData.details && (
+                  <p className="text-xs text-muted-foreground mt-1">
+                    {formData.details.length}/2000 characters
+                  </p>
+                )}
               </div>
 
               <div className="border-t pt-4 mt-4">
@@ -426,6 +449,14 @@ export default function Orders() {
                       </div>
                     </div>
                   </div>
+
+                  {/* Order Details Section */}
+                  {order.details && (
+                    <div className="p-3 bg-blue-50 rounded-lg border border-blue-200">
+                      <p className="text-xs font-medium text-blue-900 mb-1">Order Details:</p>
+                      <p className="text-sm text-blue-800 whitespace-pre-wrap">{order.details}</p>
+                    </div>
+                  )}
 
                   {/* Action Buttons */}
                   <div className="flex flex-wrap gap-2">
