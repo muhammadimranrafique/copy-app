@@ -20,9 +20,16 @@ import type { Expense, ExpenseCategory, ExpenseCreate } from '@/lib/api-types';
 
 const EXPENSE_CATEGORIES: ExpenseCategory[] = [
   'MATERIAL',
-  'STAFF', 
+  'STAFF',
   'UTILITIES',
   'PRINTING',
+  'PRINTING_1',
+  'PRINTING_2',
+  'PRINTING_3',
+  'PAPER',
+  'PAPER_1',
+  'PAPER_2',
+  'PAPER_3',
   'DELIVERY',
   'MISC'
 ];
@@ -41,7 +48,7 @@ export default function Expenses() {
   const [endDate, setEndDate] = useState<string>('');
   const { formatCurrency } = useCurrency();
   const { user, isLoading: authLoading } = useAuth();
-  
+
   const [formData, setFormData] = useState<ExpenseCreate>({
     category: 'MATERIAL',
     amount: 0,
@@ -102,8 +109,8 @@ export default function Expenses() {
   // Filter expenses by category and date range
   const filteredExpenses = expenses.filter((expense) => {
     const categoryMatch = filterCategory === 'All' || expense.category === filterCategory;
-    const dateMatch = (!startDate || expense.expenseDate >= startDate) && 
-                      (!endDate || expense.expenseDate <= endDate);
+    const dateMatch = (!startDate || expense.expenseDate >= startDate) &&
+      (!endDate || expense.expenseDate <= endDate);
     return categoryMatch && dateMatch;
   });
 
@@ -112,12 +119,12 @@ export default function Expenses() {
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    
+
     if (!formData.description.trim()) {
       toast.error('Please enter a description');
       return;
     }
-    
+
     if (formData.amount <= 0) {
       toast.error('Amount must be greater than 0');
       return;
@@ -131,7 +138,7 @@ export default function Expenses() {
         await createExpense(formData);
         toast.success('Expense added successfully');
       }
-      
+
       setDialogOpen(false);
       setEditingExpense(null);
       setFormData({
@@ -195,9 +202,16 @@ export default function Expenses() {
   const getCategoryBadge = (category: string) => {
     const colors: Record<string, string> = {
       'MATERIAL': 'bg-blue-100 text-blue-700',
-      'STAFF': 'bg-green-100 text-green-700', 
+      'STAFF': 'bg-green-100 text-green-700',
       'UTILITIES': 'bg-yellow-100 text-yellow-700',
       'PRINTING': 'bg-purple-100 text-purple-700',
+      'PRINTING_1': 'bg-purple-100 text-purple-700',
+      'PRINTING_2': 'bg-purple-200 text-purple-800',
+      'PRINTING_3': 'bg-purple-300 text-purple-900',
+      'PAPER': 'bg-teal-100 text-teal-700',
+      'PAPER_1': 'bg-teal-100 text-teal-700',
+      'PAPER_2': 'bg-teal-200 text-teal-800',
+      'PAPER_3': 'bg-teal-300 text-teal-900',
       'DELIVERY': 'bg-orange-100 text-orange-700',
       'MISC': 'bg-gray-100 text-gray-700'
     };
@@ -342,7 +356,7 @@ export default function Expenses() {
             </SelectContent>
           </Select>
         </div>
-        
+
         <div>
           <Label htmlFor="startDate" className="text-sm">Start Date</Label>
           <Input
@@ -352,7 +366,7 @@ export default function Expenses() {
             onChange={(e) => setStartDate(e.target.value)}
           />
         </div>
-        
+
         <div>
           <Label htmlFor="endDate" className="text-sm">End Date</Label>
           <Input
@@ -398,9 +412,9 @@ export default function Expenses() {
                       </Badge>
                     )}
                   </div>
-                  
+
                   <h3 className="font-semibold text-base sm:text-lg mb-1 break-words">{expense.description}</h3>
-                  
+
                   <div className="flex flex-wrap items-center gap-2 sm:gap-4 text-xs sm:text-sm text-gray-600">
                     <span>Date: {format(new Date(expense.expenseDate), 'MMM dd, yyyy')}</span>
                     {expense.referenceNumber && (
@@ -408,26 +422,26 @@ export default function Expenses() {
                     )}
                   </div>
                 </div>
-                
+
                 <div className="flex items-center justify-between lg:justify-end gap-3 w-full lg:w-auto">
                   <div className="text-left lg:text-right">
                     <p className="text-xl sm:text-2xl font-bold text-red-600">
                       {formatCurrency(expense.amount)}
                     </p>
                   </div>
-                  
+
                   <div className="flex gap-2 flex-shrink-0">
-                    <Button 
-                      variant="outline" 
+                    <Button
+                      variant="outline"
                       size="sm"
                       onClick={() => handleEdit(expense)}
                       className="h-9 w-9 p-0"
                     >
                       <Edit className="h-4 w-4" />
                     </Button>
-                    <Button 
-                      variant="outline" 
-                      size="sm" 
+                    <Button
+                      variant="outline"
+                      size="sm"
                       onClick={() => handleDelete(expense.id)}
                       className="text-red-600 hover:text-red-700 h-9 w-9 p-0"
                     >
@@ -439,7 +453,7 @@ export default function Expenses() {
             </CardContent>
           </Card>
         ))}
-        
+
         {filteredExpenses.length === 0 && (
           <div className="text-center py-12">
             <Receipt className="h-12 w-12 text-gray-400 mx-auto mb-4" />

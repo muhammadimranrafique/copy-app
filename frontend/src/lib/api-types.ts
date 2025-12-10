@@ -59,7 +59,7 @@ export interface PaymentCreate {
   orderId?: string;
 }
 
-export type ExpenseCategory = 'MATERIAL' | 'STAFF' | 'UTILITIES' | 'PRINTING' | 'DELIVERY' | 'MISC';
+export type ExpenseCategory = 'MATERIAL' | 'STAFF' | 'UTILITIES' | 'PRINTING' | 'PRINTING_1' | 'PRINTING_2' | 'PRINTING_3' | 'PAPER' | 'PAPER_1' | 'PAPER_2' | 'PAPER_3' | 'DELIVERY' | 'MISC';
 
 export interface Expense {
   id: string;
