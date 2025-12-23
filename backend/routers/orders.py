@@ -59,6 +59,22 @@ def get_orders(
         response_orders = []
         for order in orders:
             try:
+                from models import OrderItemRead
+                
+                # Serialize order items
+                items_read = [
+                    OrderItemRead(
+                        id=item.id,
+                        itemDescription=item.item_description,
+                        quantity=item.quantity,
+                        pages=item.pages,
+                        paper=item.paper,
+                        unitPrice=item.unit_price,
+                        totalPrice=item.total_price
+                    )
+                    for item in order.items
+                ]
+                
                 # Create OrderRead using field names that match the model definition
                 order_data = OrderRead(
                     id=order.id,
@@ -74,7 +90,8 @@ def get_orders(
                     details=order.details,           # Include order details
                     orderCategory=order.order_category,  # Include order category
                     pages=order.pages,               # Include pages
-                    paper=order.paper                # Include paper
+                    paper=order.paper,               # Include paper
+                    items=items_read                 # Include order items
                 )
                 response_orders.append(order_data)
             except Exception as e:
@@ -111,8 +128,10 @@ def create_order(
     session: Session = Depends(get_session),
     current_user: User = Depends(get_current_user)
 ):
-    """Create a new order with optional initial payment."""
+    """Create a new order with multiple items and optional initial payment."""
     try:
+        from models import OrderItem
+        
         # Convert frontend field names to backend field names
         order_dict = order_data.dict()
         
@@ -121,7 +140,7 @@ def create_order(
         payment_mode = order_dict.pop('paymentMode', 'Cash')
         payment_date_str = order_dict.pop('paymentDate', None)
         
-        # Extract and validate details field
+        # Extract and validate details field (now optional, can be derived from items)
         details = order_dict.pop('details', None)
         if details and len(details) > 2000:
             raise HTTPException(
@@ -132,46 +151,63 @@ def create_order(
         # Extract order category
         order_category = order_dict.pop('orderCategory', 'Standard Order')
         
-        # Extract and validate pages field
-        pages = order_dict.pop('pages', None)
-        if pages is not None:
-            try:
-                pages = int(pages)
-                if pages < 0:
-                    raise HTTPException(
-                        status_code=status.HTTP_400_BAD_REQUEST,
-                        detail="Pages must be a positive number"
-                    )
-            except (ValueError, TypeError):
+        # Extract items list
+        items_data = order_dict.pop('items', None)
+        
+        # Extract legacy single-item fields for backward compatibility
+        legacy_pages = order_dict.pop('pages', None)
+        legacy_paper = order_dict.pop('paper', None)
+        
+        # Validate items - either new items array or legacy fields must be provided
+        if items_data and len(items_data) > 0:
+            # New multi-item order
+            if len(items_data) == 0:
                 raise HTTPException(
                     status_code=status.HTTP_400_BAD_REQUEST,
-                    detail="Pages must be a valid number"
+                    detail="Order must contain at least one item"
                 )
-        
-        # Extract and validate paper field
-        paper = order_dict.pop('paper', None)
-        if paper and len(paper) > 200:
+            
+            # Calculate total from items
+            calculated_total = sum(float(item.get('totalPrice', 0)) for item in items_data)
+            order_dict['total_amount'] = calculated_total
+            
+        elif order_dict.get('totalAmount') is not None:
+            # Legacy single-item order - create one item from order data
+            total_amount = float(order_dict.get('totalAmount', 0))
+            items_data = [{
+                'itemDescription': details or 'Product / Service Order',
+                'quantity': 1,
+                'pages': legacy_pages,
+                'paper': legacy_paper,
+                'unitPrice': total_amount,
+                'totalPrice': total_amount
+            }]
+            order_dict['total_amount'] = total_amount
+        else:
             raise HTTPException(
                 status_code=status.HTTP_400_BAD_REQUEST,
-                detail="Paper specification cannot exceed 200 characters"
+                detail="Order must contain either items array or totalAmount"
             )
         
+        # Field name mapping
         if 'orderNumber' in order_dict:
             order_dict['order_number'] = order_dict.pop('orderNumber')
         if 'leaderId' in order_dict:
             order_dict['client_id'] = order_dict.pop('leaderId')
         if 'totalAmount' in order_dict:
-            order_dict['total_amount'] = order_dict.pop('totalAmount')
+            order_dict.pop('totalAmount')  # Already set as total_amount
         
-        # Add details, category, pages, and paper to order_dict
+        # Add details and category to order_dict
         if details is not None:
             order_dict['details'] = details
         if order_category is not None:
             order_dict['order_category'] = order_category
-        if pages is not None:
-            order_dict['pages'] = pages
-        if paper is not None:
-            order_dict['paper'] = paper
+        
+        # Keep legacy fields for backward compatibility
+        if legacy_pages is not None:
+            order_dict['pages'] = legacy_pages
+        if legacy_paper is not None:
+            order_dict['paper'] = legacy_paper
         
         # Validate initial payment
         initial_payment = float(initial_payment) if initial_payment else 0.0
@@ -214,8 +250,25 @@ def create_order(
                 detail="Leader/Client not found"
             )
         
+        
+        # Create order
         db_order = Order(**order_dict)
         session.add(db_order)
+        session.flush()  # Get order ID before creating items
+        
+        # Create order items
+        for item_data in items_data:
+            order_item = OrderItem(
+                order_id=db_order.id,
+                item_description=item_data.get('itemDescription', 'Item'),
+                quantity=int(item_data.get('quantity', 1)),
+                pages=item_data.get('pages'),
+                paper=item_data.get('paper'),
+                unit_price=float(item_data.get('unitPrice', 0)),
+                total_price=float(item_data.get('totalPrice', 0))
+            )
+            session.add(order_item)
+        
         session.commit()
         session.refresh(db_order)
         
@@ -579,8 +632,19 @@ def generate_invoice(
         "paid_amount": float(order.paid_amount),    # Required for payment summary
         "balance": float(order.balance),            # Required for payment summary
         "status": order.status,
-        "pages": order.pages,                       # Include pages for invoice
-        "paper": order.paper                        # Include paper for invoice
+        "pages": order.pages,                       # Legacy field for backward compatibility
+        "paper": order.paper,                       # Legacy field for backward compatibility
+        "items": [
+            {
+                "description": item.item_description,
+                "quantity": item.quantity,
+                "pages": item.pages,
+                "paper": item.paper,
+                "unit_price": float(item.unit_price),
+                "total_price": float(item.total_price)
+            }
+            for item in order.items
+        ]
     }
     
     client_dict = {

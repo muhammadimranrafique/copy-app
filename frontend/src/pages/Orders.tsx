@@ -17,6 +17,16 @@ import { toast } from 'sonner';
 import { Badge } from '@/components/ui/badge';
 import { format } from 'date-fns';
 
+interface OrderItem {
+  id?: string;
+  itemDescription: string;
+  quantity: number;
+  pages?: number;
+  paper?: string;
+  unitPrice: number;
+  totalPrice: number;
+}
+
 interface Order {
   id: string;
   orderNumber: string;
@@ -32,6 +42,7 @@ interface Order {
   orderCategory?: string;
   pages?: number;
   paper?: string;
+  items?: OrderItem[];
 }
 
 interface Leader {
@@ -56,15 +67,22 @@ export default function Orders() {
     orderNumber: '',
     leaderId: '',
     orderDate: new Date().toISOString().split('T')[0],
-    totalAmount: 0,
     status: 'Pending',
+    items: [
+      {
+        itemDescription: '',
+        quantity: 1,
+        pages: 0,
+        paper: '',
+        unitPrice: 0,
+        totalPrice: 0
+      }
+    ],
     initialPayment: 0,
     paymentMode: 'Cash',
     paymentDate: new Date().toISOString().split('T')[0],
     details: '',
-    orderCategory: 'Standard Order',
-    pages: 0,
-    paper: ''
+    orderCategory: 'Standard Order'
   });
   const [editFormData, setEditFormData] = useState({
     orderNumber: '',
@@ -105,6 +123,48 @@ export default function Orders() {
   const leaders = leadersData?.leaders ?? [];
   const loading = ordersLoading || leadersLoading;
 
+  // Item management functions
+  const addItem = () => {
+    setFormData({
+      ...formData,
+      items: [
+        ...formData.items,
+        {
+          itemDescription: '',
+          quantity: 1,
+          pages: 0,
+          paper: '',
+          unitPrice: 0,
+          totalPrice: 0
+        }
+      ]
+    });
+  };
+
+  const removeItem = (index: number) => {
+    const newItems = formData.items.filter((_, i) => i !== index);
+    setFormData({ ...formData, items: newItems });
+  };
+
+  const updateItem = (index: number, field: string, value: any) => {
+    const newItems = [...formData.items];
+    newItems[index] = { ...newItems[index], [field]: value };
+
+    // Auto-calculate total price when quantity or unitPrice changes
+    if (field === 'quantity' || field === 'unitPrice') {
+      const qty = field === 'quantity' ? value : newItems[index].quantity;
+      const price = field === 'unitPrice' ? value : newItems[index].unitPrice;
+      newItems[index].totalPrice = qty * price;
+    }
+
+    setFormData({ ...formData, items: newItems });
+  };
+
+  // Calculate total amount from all items
+  const calculateTotal = () => {
+    return formData.items.reduce((sum, item) => sum + item.totalPrice, 0);
+  };
+
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!formData.orderNumber.trim()) {
@@ -117,7 +177,31 @@ export default function Orders() {
       return;
     }
 
-    if (formData.totalAmount <= 0) {
+    // Validate items
+    if (!formData.items || formData.items.length === 0) {
+      toast.error('Please add at least one item');
+      return;
+    }
+
+    // Validate each item
+    for (let i = 0; i < formData.items.length; i++) {
+      const item = formData.items[i];
+      if (!item.itemDescription.trim()) {
+        toast.error(`Item ${i + 1}: Please enter item description`);
+        return;
+      }
+      if (item.quantity <= 0) {
+        toast.error(`Item ${i + 1}: Quantity must be greater than 0`);
+        return;
+      }
+      if (item.unitPrice <= 0) {
+        toast.error(`Item ${i + 1}: Unit price must be greater than 0`);
+        return;
+      }
+    }
+
+    const totalAmount = calculateTotal();
+    if (totalAmount <= 0) {
       toast.error('Total amount must be greater than 0');
       return;
     }
@@ -128,8 +212,8 @@ export default function Orders() {
       return;
     }
 
-    if (formData.initialPayment > formData.totalAmount) {
-      toast.error(`Initial payment (${formatCurrency(formData.initialPayment)}) cannot exceed total amount (${formatCurrency(formData.totalAmount)})`);
+    if (formData.initialPayment > totalAmount) {
+      toast.error(`Initial payment (${formatCurrency(formData.initialPayment)}) cannot exceed total amount (${formatCurrency(totalAmount)})`);
       return;
     }
 
@@ -141,15 +225,22 @@ export default function Orders() {
         orderNumber: '',
         leaderId: '',
         orderDate: new Date().toISOString().split('T')[0],
-        totalAmount: 0,
         status: 'Pending',
+        items: [
+          {
+            itemDescription: '',
+            quantity: 1,
+            pages: 0,
+            paper: '',
+            unitPrice: 0,
+            totalPrice: 0
+          }
+        ],
         initialPayment: 0,
         paymentMode: 'Cash',
         paymentDate: new Date().toISOString().split('T')[0],
         details: '',
-        orderCategory: 'Standard Order',
-        pages: 0,
-        paper: ''
+        orderCategory: 'Standard Order'
       });
       loadOrders();
     } catch (error: any) {
@@ -351,16 +442,113 @@ export default function Orders() {
                   required
                 />
               </div>
-              <div>
-                <Label htmlFor="totalAmount">Total Amount *</Label>
-                <Input
-                  id="totalAmount"
-                  type="number"
-                  step="0.01"
-                  value={formData.totalAmount}
-                  onChange={(e) => setFormData({ ...formData, totalAmount: parseFloat(e.target.value) || 0 })}
-                  required
-                />
+              <div className="space-y-4">
+                <div className="flex justify-between items-center">
+                  <Label className="text-base font-semibold">Order Items *</Label>
+                  <Button type="button" variant="outline" size="sm" onClick={addItem}>
+                    <Plus className="w-4 h-4 mr-1" /> Add Item
+                  </Button>
+                </div>
+
+                {formData.items.map((item, index) => (
+                  <Card key={index} className="p-4 bg-slate-50">
+                    <div className="space-y-3">
+                      <div className="flex justify-between items-center mb-2">
+                        <span className="text-sm font-medium text-slate-700">Item {index + 1}</span>
+                        {formData.items.length > 1 && (
+                          <Button
+                            type="button"
+                            variant="destructive"
+                            size="sm"
+                            onClick={() => removeItem(index)}
+                          >
+                            <Trash2 className="w-4 h-4" />
+                          </Button>
+                        )}
+                      </div>
+
+                      <div>
+                        <Label htmlFor={`item-desc-${index}`}>Item Description *</Label>
+                        <Input
+                          id={`item-desc-${index}`}
+                          value={item.itemDescription}
+                          onChange={(e) => updateItem(index, 'itemDescription', e.target.value)}
+                          placeholder="e.g., Copy, Register, Diary"
+                          required
+                        />
+                      </div>
+
+                      <div className="grid grid-cols-2 gap-3">
+                        <div>
+                          <Label htmlFor={`item-qty-${index}`}>Quantity *</Label>
+                          <Input
+                            id={`item-qty-${index}`}
+                            type="number"
+                            min="1"
+                            value={item.quantity}
+                            onChange={(e) => updateItem(index, 'quantity', parseInt(e.target.value) || 1)}
+                            required
+                          />
+                        </div>
+                        <div>
+                          <Label htmlFor={`item-price-${index}`}>Unit Price *</Label>
+                          <Input
+                            id={`item-price-${index}`}
+                            type="number"
+                            step="0.01"
+                            min="0"
+                            value={item.unitPrice}
+                            onChange={(e) => updateItem(index, 'unitPrice', parseFloat(e.target.value) || 0)}
+                            required
+                          />
+                        </div>
+                      </div>
+
+                      <div className="grid grid-cols-2 gap-3">
+                        <div>
+                          <Label htmlFor={`item-pages-${index}`}>Pages</Label>
+                          <Input
+                            id={`item-pages-${index}`}
+                            type="number"
+                            min="0"
+                            value={item.pages}
+                            onChange={(e) => updateItem(index, 'pages', parseInt(e.target.value) || 0)}
+                            placeholder="Optional"
+                          />
+                        </div>
+                        <div>
+                          <Label htmlFor={`item-paper-${index}`}>Paper</Label>
+                          <Input
+                            id={`item-paper-${index}`}
+                            type="text"
+                            maxLength={200}
+                            value={item.paper}
+                            onChange={(e) => updateItem(index, 'paper', e.target.value)}
+                            placeholder="e.g., A4 80gsm"
+                          />
+                        </div>
+                      </div>
+
+                      <div className="pt-2 border-t">
+                        <div className="flex justify-between items-center">
+                          <span className="text-sm text-slate-600">Item Total:</span>
+                          <span className="text-base font-semibold text-blue-600">
+                            {formatCurrency(item.totalPrice)}
+                          </span>
+                        </div>
+                      </div>
+                    </div>
+                  </Card>
+                ))}
+
+                <div className="p-4 bg-blue-50 rounded-lg border-2 border-blue-200">
+                  <div className="flex justify-between items-center">
+                    <span className="text-lg font-bold text-blue-900">Order Total:</span>
+                    <span className="text-xl font-bold text-blue-600">
+                      {formatCurrency(calculateTotal())}
+                    </span>
+                  </div>
+                </div>
               </div>
               <div>
                 <Label htmlFor="orderCategory">Order Category</Label>
@@ -376,28 +564,6 @@ export default function Orders() {
                     <SelectItem value="Bulk Order">Bulk Order</SelectItem>
                   </SelectContent>
                 </Select>
-              </div>
-              <div>
-                <Label htmlFor="pages">Pages</Label>
-                <Input
-                  id="pages"
-                  type="number"
-                  min="0"
-                  value={formData.pages}
-                  onChange={(e) => setFormData({ ...formData, pages: parseInt(e.target.value) || 0 })}
-                  placeholder="Number of pages"
-                />
-              </div>
-              <div>
-                <Label htmlFor="paper">Paper Specification</Label>
-                <Input
-                  id="paper"
-                  type="text"
-                  maxLength={200}
-                  value={formData.paper}
-                  onChange={(e) => setFormData({ ...formData, paper: e.target.value })}
-                  placeholder="e.g., A4 80gsm"
-                />
               </div>
               <div>
                 <Label htmlFor="status">Status</Label>
