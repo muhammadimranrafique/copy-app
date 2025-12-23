@@ -30,6 +30,8 @@ interface Order {
   balance?: number;
   details?: string;
   orderCategory?: string;
+  pages?: number;
+  paper?: string;
 }
 
 interface Leader {
@@ -60,7 +62,9 @@ export default function Orders() {
     paymentMode: 'Cash',
     paymentDate: new Date().toISOString().split('T')[0],
     details: '',
-    orderCategory: 'Standard Order'
+    orderCategory: 'Standard Order',
+    pages: 0,
+    paper: ''
   });
   const [editFormData, setEditFormData] = useState({
     orderNumber: '',
@@ -69,7 +73,9 @@ export default function Orders() {
     totalAmount: 0,
     status: 'Pending',
     details: '',
-    orderCategory: 'Standard Order'
+    orderCategory: 'Standard Order',
+    pages: 0,
+    paper: ''
   });
 
   const {
@@ -141,7 +147,9 @@ export default function Orders() {
         paymentMode: 'Cash',
         paymentDate: new Date().toISOString().split('T')[0],
         details: '',
-        orderCategory: 'Standard Order'
+        orderCategory: 'Standard Order',
+        pages: 0,
+        paper: ''
       });
       loadOrders();
     } catch (error: any) {
@@ -207,7 +215,9 @@ export default function Orders() {
       totalAmount: order.totalAmount,
       status: order.status,
       details: order.details || '',
-      orderCategory: order.orderCategory || 'Standard Order'
+      orderCategory: order.orderCategory || 'Standard Order',
+      pages: order.pages || 0,
+      paper: order.paper || ''
     });
     setEditDialogOpen(true);
   };
@@ -366,6 +376,28 @@ export default function Orders() {
                     <SelectItem value="Bulk Order">Bulk Order</SelectItem>
                   </SelectContent>
                 </Select>
+              </div>
+              <div>
+                <Label htmlFor="pages">Pages</Label>
+                <Input
+                  id="pages"
+                  type="number"
+                  min="0"
+                  value={formData.pages}
+                  onChange={(e) => setFormData({ ...formData, pages: parseInt(e.target.value) || 0 })}
+                  placeholder="Number of pages"
+                />
+              </div>
+              <div>
+                <Label htmlFor="paper">Paper Specification</Label>
+                <Input
+                  id="paper"
+                  type="text"
+                  maxLength={200}
+                  value={formData.paper}
+                  onChange={(e) => setFormData({ ...formData, paper: e.target.value })}
+                  placeholder="e.g., A4 80gsm"
+                />
               </div>
               <div>
                 <Label htmlFor="status">Status</Label>
@@ -789,6 +821,28 @@ export default function Orders() {
               </Select>
             </div>
             <div>
+              <Label htmlFor="edit-pages">Pages</Label>
+              <Input
+                id="edit-pages"
+                type="number"
+                min="0"
+                value={editFormData.pages}
+                onChange={(e) => setEditFormData({ ...editFormData, pages: parseInt(e.target.value) || 0 })}
+                placeholder="Number of pages"
+              />
+            </div>
+            <div>
+              <Label htmlFor="edit-paper">Paper Specification</Label>
+              <Input
+                id="edit-paper"
+                type="text"
+                maxLength={200}
+                value={editFormData.paper}
+                onChange={(e) => setEditFormData({ ...editFormData, paper: e.target.value })}
+                placeholder="e.g., A4 80gsm"
+              />
+            </div>
+            <div>
               <Label htmlFor="edit-details">Order Details</Label>
               <Textarea
                 id="edit-details"
@@ -867,6 +921,6 @@ export default function Orders() {
           </AlertDialogFooter>
         </AlertDialogContent>
       </AlertDialog>
-    </div>
+    </div >
   );
 }

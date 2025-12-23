@@ -162,39 +162,54 @@ class ProfessionalInvoiceGenerator:
         story.append(Spacer(1, 3*mm))
 
     def _create_items_table(self, story, styles, order_data: Dict[str, Any], company_settings: Optional[Dict[str, Any]] = None):
-        """Create professional items table with modern styling."""
+        """Create professional items table with modern styling including Pages and Paper columns."""
         currency_symbol = (company_settings or {}).get('currency_symbol', 'Rs')
         total_amount = order_data.get('total_amount', 0)
+        pages = order_data.get('pages')
+        paper = order_data.get('paper')
         
-        # Header
+        # Format pages and paper values
+        pages_display = str(pages) if pages is not None else 'N/A'
+        paper_display = paper if paper else 'N/A'
+        
+        # Header with new columns: Description, Pages, Paper, Quantity, Unit Price, Total
         items_data = [
-            ['Description', 'Quantity', 'Unit Price', 'Total']
+            ['Description', 'Pages', 'Paper', 'Qty', 'Unit Price', 'Total']
         ]
         
-        # Placeholder item
+        # Enhanced description with quantity information
+        description = 'Qty: 1 - Product / Service Order'
+        
+        # Data row with all columns
         items_data.append([
-            'Product / Service Order',
+            description,
+            pages_display,
+            paper_display,
             '1',
             f"{currency_symbol} {total_amount:,.2f}",
             f"{currency_symbol} {total_amount:,.2f}"
         ])
         
-        items_table = Table(items_data, colWidths=[85*mm, 30*mm, 40*mm, 35*mm])
+        # Adjusted column widths to fit A4 (total ~190mm)
+        # Description: 55mm, Pages: 18mm, Paper: 30mm, Qty: 15mm, Unit Price: 35mm, Total: 35mm
+        items_table = Table(items_data, colWidths=[55*mm, 18*mm, 30*mm, 15*mm, 36*mm, 36*mm])
         items_table.setStyle(TableStyle([
             # Header
             ('BACKGROUND', (0, 0), (-1, 0), self.primary),
             ('TEXTCOLOR', (0, 0), (-1, 0), colors.white),
             ('FONTNAME', (0, 0), (-1, 0), 'Helvetica-Bold'),
-            ('FONTSIZE', (0, 0), (-1, 0), 10),
-            ('ALIGN', (0, 0), (-1, -1), 'LEFT'),
-            ('ALIGN', (1, 0), (-1, -1), 'CENTER'),
-            ('ALIGN', (2, 0), (-1, -1), 'RIGHT'),
+            ('FONTSIZE', (0, 0), (-1, 0), 9),
+            ('ALIGN', (0, 0), (0, -1), 'LEFT'),      # Description - left
+            ('ALIGN', (1, 0), (1, -1), 'CENTER'),    # Pages - center
+            ('ALIGN', (2, 0), (2, -1), 'LEFT'),      # Paper - left
+            ('ALIGN', (3, 0), (3, -1), 'CENTER'),    # Qty - center
+            ('ALIGN', (4, 0), (-1, -1), 'RIGHT'),    # Unit Price & Total - right
             ('TOPPADDING', (0, 0), (-1, 0), 8),
             ('BOTTOMPADDING', (0, 0), (-1, 0), 8),
             # Rows
             ('GRID', (0, 0), (-1, -1), 0.5, self.border_color),
             ('ROWBACKGROUNDS', (0, 1), (-1, -1), [colors.white, self.bg_light]),
-            ('FONTSIZE', (0, 1), (-1, -1), 10),
+            ('FONTSIZE', (0, 1), (-1, -1), 9),
             ('PADDING', (0, 0), (-1, -1), 6),
             ('VALIGN', (0, 0), (-1, -1), 'MIDDLE'),
         ]))
