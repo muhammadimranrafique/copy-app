@@ -58,6 +58,8 @@ def create_expense(
                 expense_dict['expense_date'] = datetime.strptime(date_str, '%Y-%m-%d')
             else:
                 expense_dict['expense_date'] = date_str
+        if 'orderCategory' in expense_dict:
+            expense_dict['order_category'] = expense_dict.pop('orderCategory')
         
         # Ensure category is valid ExpenseCategory enum
         if 'category' in expense_dict:
@@ -119,6 +121,8 @@ def update_expense(
                 expense_dict['expense_date'] = datetime.strptime(date_str, '%Y-%m-%d')
             else:
                 expense_dict['expense_date'] = date_str
+        if 'orderCategory' in expense_dict:
+            expense_dict['order_category'] = expense_dict.pop('orderCategory')
         
         # Ensure category is valid ExpenseCategory enum
         if 'category' in expense_dict:

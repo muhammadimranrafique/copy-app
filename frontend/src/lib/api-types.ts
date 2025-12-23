@@ -69,6 +69,7 @@ export interface Expense {
   expenseDate: string;
   paymentMethod?: string;
   referenceNumber?: string;
+  orderCategory?: string;
   createdAt?: string;
 }
 
@@ -79,6 +80,7 @@ export interface ExpenseCreate {
   expenseDate: string;
   paymentMethod?: string;
   referenceNumber?: string;
+  orderCategory?: string;
 }
 
 export interface DashboardData {
