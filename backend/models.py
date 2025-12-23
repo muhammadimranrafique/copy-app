@@ -112,6 +112,45 @@ class ProductRead(SQLModel):
     class Config:
         from_attributes = True
 
+# Order Item Models
+class OrderItemBase(SQLModel):
+    item_description: str = Field(max_length=500)
+    quantity: int = Field(gt=0)
+    pages: Optional[int] = Field(default=None, ge=0)
+    paper: Optional[str] = Field(default=None, max_length=200)
+    unit_price: float = Field(gt=0)
+    total_price: float = Field(gt=0)
+
+class OrderItem(OrderItemBase, table=True):
+    __tablename__ = "order_items"
+    
+    id: UUID = Field(default_factory=uuid4, primary_key=True)
+    order_id: UUID = Field(foreign_key="orders.id")
+    created_at: datetime = Field(default_factory=datetime.utcnow)
+    
+    order: "Order" = Relationship(back_populates="items")
+
+class OrderItemCreate(SQLModel):
+    itemDescription: str
+    quantity: int
+    pages: Optional[int] = None
+    paper: Optional[str] = None
+    unitPrice: float
+    totalPrice: float
+
+class OrderItemRead(SQLModel):
+    id: UUID
+    itemDescription: str = PydanticField(..., alias="item_description")
+    quantity: int
+    pages: Optional[int] = None
+    paper: Optional[str] = None
+    unitPrice: float = PydanticField(..., alias="unit_price")
+    totalPrice: float = PydanticField(..., alias="total_price")
+    
+    class Config:
+        from_attributes = True
+        populate_by_name = True
+
 # Order Models
 class OrderBase(SQLModel):
     order_number: str
@@ -149,12 +188,18 @@ class Order(OrderBase, table=True):
         back_populates="order",
         sa_relationship_kwargs={"lazy": "selectin"}  # Use selectin loading for collections
     )
+    items: List["OrderItem"] = Relationship(
+        back_populates="order",
+        sa_relationship_kwargs={"lazy": "selectin", "cascade": "all, delete-orphan"}
+    )
 
 class OrderCreate(SQLModel):
     orderNumber: str
     leaderId: UUID
-    totalAmount: float
+    totalAmount: Optional[float] = None  # Now optional, calculated from items
     status: str = "Pending"
+    # Order items (new multi-item support)
+    items: Optional[List[OrderItemCreate]] = None
     # Initial Payment Details
     initialPayment: Optional[float] = 0.0
     paymentMode: Optional[str] = "Cash"
@@ -163,7 +208,7 @@ class OrderCreate(SQLModel):
     details: Optional[str] = None
     # Order category
     orderCategory: Optional[str] = "Standard Order"
-    # Product specifications
+    # Legacy single-item fields (for backward compatibility)
     pages: Optional[int] = None
     paper: Optional[str] = None
 
@@ -182,6 +227,7 @@ class OrderRead(SQLModel):
     orderCategory: Optional[str] = PydanticField("Standard Order", alias="order_category")
     pages: Optional[int] = PydanticField(None, alias="pages")
     paper: Optional[str] = PydanticField(None, alias="paper")
+    items: List[OrderItemRead] = []  # Include order items
 
     class Config:
         from_attributes = True

@@ -162,36 +162,49 @@ class ProfessionalInvoiceGenerator:
         story.append(Spacer(1, 3*mm))
 
     def _create_items_table(self, story, styles, order_data: Dict[str, Any], company_settings: Optional[Dict[str, Any]] = None):
-        """Create professional items table with modern styling including Pages and Paper columns."""
+        """Create professional items table with modern styling for multiple items."""
         currency_symbol = (company_settings or {}).get('currency_symbol', 'Rs')
-        total_amount = order_data.get('total_amount', 0)
-        pages = order_data.get('pages')
-        paper = order_data.get('paper')
+        items = order_data.get('items', [])
         
-        # Format pages and paper values
-        pages_display = str(pages) if pages is not None else 'N/A'
-        paper_display = paper if paper else 'N/A'
-        
-        # Header with new columns: Description, Pages, Paper, Quantity, Unit Price, Total
+        # Header with columns: Description, Pages, Paper, Qty, Unit Price, Total
         items_data = [
             ['Description', 'Pages', 'Paper', 'Qty', 'Unit Price', 'Total']
         ]
         
-        # Enhanced description with quantity information
-        description = 'Qty: 1 - Product / Service Order'
-        
-        # Data row with all columns
-        items_data.append([
-            description,
-            pages_display,
-            paper_display,
-            '1',
-            f"{currency_symbol} {total_amount:,.2f}",
-            f"{currency_symbol} {total_amount:,.2f}"
-        ])
+        # Add row for each item
+        if items and len(items) > 0:
+            for item in items:
+                pages_display = str(item.get('pages')) if item.get('pages') is not None else 'N/A'
+                paper_display = item.get('paper') or 'N/A'
+                
+                items_data.append([
+                    item.get('description', 'Item'),
+                    pages_display,
+                    paper_display,
+                    str(item.get('quantity', 1)),
+                    f"{currency_symbol} {item.get('unit_price', 0):,.2f}",
+                    f"{currency_symbol} {item.get('total_price', 0):,.2f}"
+                ])
+        else:
+            # Fallback for orders without items (backward compatibility)
+            total_amount = order_data.get('total_amount', 0)
+            pages = order_data.get('pages')
+            paper = order_data.get('paper')
+            
+            pages_display = str(pages) if pages is not None else 'N/A'
+            paper_display = paper if paper else 'N/A'
+            
+            items_data.append([
+                'Product / Service Order',
+                pages_display,
+                paper_display,
+                '1',
+                f"{currency_symbol} {total_amount:,.2f}",
+                f"{currency_symbol} {total_amount:,.2f}"
+            ])
         
         # Adjusted column widths to fit A4 (total ~190mm)
-        # Description: 55mm, Pages: 18mm, Paper: 30mm, Qty: 15mm, Unit Price: 35mm, Total: 35mm
+        # Description: 55mm, Pages: 18mm, Paper: 30mm, Qty: 15mm, Unit Price: 36mm, Total: 36mm
         items_table = Table(items_data, colWidths=[55*mm, 18*mm, 30*mm, 15*mm, 36*mm, 36*mm])
         items_table.setStyle(TableStyle([
             # Header
@@ -218,6 +231,7 @@ class ProfessionalInvoiceGenerator:
         story.append(Spacer(1, 3*mm))
         
         # Totals Section (Modern Card Style)
+        total_amount = order_data.get('total_amount', 0)
         totals_data = [
             ['Subtotal:', f"{currency_symbol} {total_amount:,.2f}"],
             ['Tax (0%):', f"{currency_symbol} 0.00"],
