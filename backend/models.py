@@ -338,6 +338,7 @@ class ExpenseBase(SQLModel):
     description: str
     payment_method: Optional[str] = "Cash"
     reference_number: Optional[str] = None
+    order_category: Optional[str] = Field(default=None, nullable=True)
 
 class Expense(ExpenseBase, table=True):
     __tablename__ = "expenses"
@@ -353,6 +354,7 @@ class ExpenseCreate(SQLModel):
     expenseDate: str
     paymentMethod: Optional[str] = "Cash"
     referenceNumber: Optional[str] = None
+    orderCategory: Optional[str] = None
 
 class ExpenseRead(SQLModel):
     id: UUID
@@ -362,6 +364,7 @@ class ExpenseRead(SQLModel):
     expenseDate: datetime = PydanticField(..., alias="expense_date")
     paymentMethod: Optional[str] = PydanticField(None, alias="payment_method")
     referenceNumber: Optional[str] = PydanticField(None, alias="reference_number")
+    orderCategory: Optional[str] = PydanticField(None, alias="order_category")
     createdAt: datetime = PydanticField(..., alias="created_at")
 
     class Config:

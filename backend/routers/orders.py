@@ -332,8 +332,10 @@ def update_order(
     session: Session = Depends(get_session),
     current_user: User = Depends(get_current_user)
 ):
-    """Update an order with validation to ensure data integrity."""
+    """Update an order with multiple items support and validation."""
     try:
+        from models import OrderItem
+        
         statement = select(Order).where(Order.id == order_id)
         order = session.exec(statement).first()
         
@@ -354,29 +356,45 @@ def update_order(
                 detail="Order details cannot exceed 2000 characters"
             )
         
-        # Extract and validate pages field
-        pages = order_dict.pop('pages', None)
-        if pages is not None:
-            try:
-                pages = int(pages)
-                if pages < 0:
-                    raise HTTPException(
-                        status_code=status.HTTP_400_BAD_REQUEST,
-                        detail="Pages must be a positive number"
-                    )
-            except (ValueError, TypeError):
+        # Extract order category
+        order_category = order_dict.pop('orderCategory', None)
+        
+        # Extract items list
+        items_data = order_dict.pop('items', None)
+        
+        # Extract legacy fields
+        legacy_pages = order_dict.pop('pages', None)
+        legacy_paper = order_dict.pop('paper', None)
+        
+        
+        # Validate and process items
+        if items_data and len(items_data) > 0:
+            # New multi-item update
+            if len(items_data) == 0:
                 raise HTTPException(
                     status_code=status.HTTP_400_BAD_REQUEST,
-                    detail="Pages must be a valid number"
+                    detail="Order must contain at least one item"
                 )
-        
-        # Extract and validate paper field
-        paper = order_dict.pop('paper', None)
-        if paper and len(paper) > 200:
-            raise HTTPException(
-                status_code=status.HTTP_400_BAD_REQUEST,
-                detail="Paper specification cannot exceed 200 characters"
-            )
+            
+            # Calculate total from items
+            calculated_total = sum(float(item.get('totalPrice', 0)) for item in items_data)
+            new_total_amount = calculated_total
+            
+        elif order_dict.get('totalAmount') is not None:
+            # Legacy single-item update
+            new_total_amount = float(order_dict.get('totalAmount', 0))
+            items_data = [{
+                'itemDescription': details or order.details or 'Product / Service Order',
+                'quantity': 1,
+                'pages': legacy_pages,
+                'paper': legacy_paper,
+                'unitPrice': new_total_amount,
+                'totalPrice': new_total_amount
+            }]
+        else:
+            # Keep existing total if no items or totalAmount provided
+            new_total_amount = float(order.total_amount)
+            items_data = None  # Don't update items
         
         # Map frontend camelCase to backend snake_case
         if 'orderNumber' in order_dict:
@@ -384,34 +402,34 @@ def update_order(
         if 'leaderId' in order_dict:
             order_dict['client_id'] = order_dict.pop('leaderId')
         if 'totalAmount' in order_dict:
-            order_dict['total_amount'] = order_dict.pop('totalAmount')
+            order_dict.pop('totalAmount')  # Already processed
         if 'orderCategory' in order_dict:
-            order_dict['order_category'] = order_dict.pop('orderCategory')
+            order_dict.pop('orderCategory')  # Already extracted
         
         # Remove payment-related fields from update (these should not be modified via edit)
         order_dict.pop('initialPayment', None)
         order_dict.pop('paymentMode', None)
         order_dict.pop('paymentDate', None)
         
-        # Validate total_amount if being updated
-        if 'total_amount' in order_dict:
-            new_total = float(order_dict['total_amount'])
-            current_paid = float(order.paid_amount)
-            
-            if new_total < current_paid:
-                raise HTTPException(
-                    status_code=status.HTTP_400_BAD_REQUEST,
-                    detail=f"Total amount ({new_total:,.2f}) cannot be less than already paid amount ({current_paid:,.2f})"
-                )
-            
-            # Recalculate balance
-            order_dict['balance'] = new_total - current_paid
-            
-            # Update status based on new balance
-            if order_dict['balance'] <= 0:
-                order_dict['status'] = OrderStatus.PAID.value
-            elif current_paid > 0:
-                order_dict['status'] = OrderStatus.PARTIALLY_PAID.value
+        
+        # Validate total_amount
+        current_paid = float(order.paid_amount)
+        
+        if new_total_amount < current_paid:
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail=f"Total amount ({new_total_amount:,.2f}) cannot be less than already paid amount ({current_paid:,.2f})"
+            )
+        
+        # Update total amount and recalculate balance
+        order_dict['total_amount'] = new_total_amount
+        order_dict['balance'] = new_total_amount - current_paid
+        
+        # Update status based on new balance
+        if order_dict['balance'] <= 0:
+            order_dict['status'] = OrderStatus.PAID.value
+        elif current_paid > 0:
+            order_dict['status'] = OrderStatus.PARTIALLY_PAID.value
         
         # Verify client exists if being updated
         if 'client_id' in order_dict:
@@ -424,18 +442,47 @@ def update_order(
                     detail="Leader/Client not found"
                 )
         
+        
         # Update order fields
         for key, value in order_dict.items():
             if hasattr(order, key):
                 setattr(order, key, value)
         
-        # Update details, pages, and paper separately if provided
+        # Update details, category, and legacy fields separately if provided
         if details is not None:
             order.details = details
-        if pages is not None:
-            order.pages = pages
-        if paper is not None:
-            order.paper = paper
+        if order_category is not None:
+            order.order_category = order_category
+        if legacy_pages is not None:
+            order.pages = legacy_pages
+        if legacy_paper is not None:
+            order.paper = legacy_paper
+        
+        # Update order items if provided
+        if items_data is not None:
+            # Delete existing items
+            # Iterate over a copy of the list and explicitly delete
+            items_to_delete = list(order.items)
+            for existing_item in items_to_delete:
+                session.delete(existing_item)
+            
+            # Clear the relationship on the object to remove references to deleted instances
+            order.items = []
+            
+            session.flush()  # Ensure deletions are processed
+            
+            # Create new items
+            for item_data in items_data:
+                order_item = OrderItem(
+                    order_id=order.id,
+                    item_description=item_data.get('itemDescription', 'Item'),
+                    quantity=int(item_data.get('quantity', 1)),
+                    pages=item_data.get('pages'),
+                    paper=item_data.get('paper'),
+                    unit_price=float(item_data.get('unitPrice', 0)),
+                    total_price=float(item_data.get('totalPrice', 0))
+                )
+                session.add(order_item)
         
         session.add(order)
         session.commit()

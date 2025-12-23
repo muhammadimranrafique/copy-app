@@ -81,19 +81,24 @@ export default function Orders() {
     initialPayment: 0,
     paymentMode: 'Cash',
     paymentDate: new Date().toISOString().split('T')[0],
-    details: '',
-    orderCategory: 'Standard Order'
+    details: ''
   });
   const [editFormData, setEditFormData] = useState({
     orderNumber: '',
     leaderId: '',
     orderDate: '',
-    totalAmount: 0,
     status: 'Pending',
-    details: '',
-    orderCategory: 'Standard Order',
-    pages: 0,
-    paper: ''
+    items: [
+      {
+        itemDescription: '',
+        quantity: 1,
+        pages: 0,
+        paper: '',
+        unitPrice: 0,
+        totalPrice: 0
+      }
+    ],
+    details: ''
   });
 
   const {
@@ -163,6 +168,48 @@ export default function Orders() {
   // Calculate total amount from all items
   const calculateTotal = () => {
     return formData.items.reduce((sum, item) => sum + item.totalPrice, 0);
+  };
+
+  // Edit Item management functions
+  const addEditItem = () => {
+    setEditFormData({
+      ...editFormData,
+      items: [
+        ...editFormData.items,
+        {
+          itemDescription: '',
+          quantity: 1,
+          pages: 0,
+          paper: '',
+          unitPrice: 0,
+          totalPrice: 0
+        }
+      ]
+    });
+  };
+
+  const removeEditItem = (index: number) => {
+    const newItems = editFormData.items.filter((_, i) => i !== index);
+    setEditFormData({ ...editFormData, items: newItems });
+  };
+
+  const updateEditItem = (index: number, field: string, value: any) => {
+    const newItems = [...editFormData.items];
+    newItems[index] = { ...newItems[index], [field]: value };
+
+    // Auto-calculate total price when quantity or unitPrice changes
+    if (field === 'quantity' || field === 'unitPrice') {
+      const qty = field === 'quantity' ? value : newItems[index].quantity;
+      const price = field === 'unitPrice' ? value : newItems[index].unitPrice;
+      newItems[index].totalPrice = qty * price;
+    }
+
+    setEditFormData({ ...editFormData, items: newItems });
+  };
+
+  // Calculate total amount for edit form
+  const calculateEditTotal = () => {
+    return editFormData.items.reduce((sum, item) => sum + item.totalPrice, 0);
   };
 
   const handleSubmit = async (e: React.FormEvent) => {
@@ -239,8 +286,7 @@ export default function Orders() {
         initialPayment: 0,
         paymentMode: 'Cash',
         paymentDate: new Date().toISOString().split('T')[0],
-        details: '',
-        orderCategory: 'Standard Order'
+        details: ''
       });
       loadOrders();
     } catch (error: any) {
@@ -299,16 +345,33 @@ export default function Orders() {
 
   const handleEditOrder = (order: Order) => {
     setEditingOrder(order);
+
+    // Prepare items - use existing items or create one from legacy fields
+    let items = order.items && order.items.length > 0 ? order.items.map(item => ({
+      itemDescription: item.itemDescription,
+      quantity: item.quantity,
+      pages: item.pages || 0,
+      paper: item.paper || '',
+      unitPrice: item.unitPrice,
+      totalPrice: item.totalPrice
+    })) : [
+      {
+        itemDescription: order.details || 'Product / Service Order',
+        quantity: 1,
+        pages: order.pages || 0,
+        paper: order.paper || '',
+        unitPrice: order.totalAmount,
+        totalPrice: order.totalAmount
+      }
+    ];
+
     setEditFormData({
       orderNumber: order.orderNumber,
       leaderId: order.leaderId,
       orderDate: order.orderDate ? new Date(order.orderDate).toISOString().split('T')[0] : '',
-      totalAmount: order.totalAmount,
       status: order.status,
-      details: order.details || '',
-      orderCategory: order.orderCategory || 'Standard Order',
-      pages: order.pages || 0,
-      paper: order.paper || ''
+      items: items,
+      details: order.details || ''
     });
     setEditDialogOpen(true);
   };
@@ -328,14 +391,38 @@ export default function Orders() {
       return;
     }
 
-    if (editFormData.totalAmount <= 0) {
+    // Validate items
+    if (!editFormData.items || editFormData.items.length === 0) {
+      toast.error('Please add at least one item');
+      return;
+    }
+
+    // Validate each item
+    for (let i = 0; i < editFormData.items.length; i++) {
+      const item = editFormData.items[i];
+      if (!item.itemDescription.trim()) {
+        toast.error(`Item ${i + 1}: Please enter item description`);
+        return;
+      }
+      if (item.quantity <= 0) {
+        toast.error(`Item ${i + 1}: Quantity must be greater than 0`);
+        return;
+      }
+      if (item.unitPrice <= 0) {
+        toast.error(`Item ${i + 1}: Unit price must be greater than 0`);
+        return;
+      }
+    }
+
+    const totalAmount = calculateEditTotal();
+    if (totalAmount <= 0) {
       toast.error('Total amount must be greater than 0');
       return;
     }
 
     // Check if total amount is less than paid amount
-    if (editFormData.totalAmount < (editingOrder.paidAmount || 0)) {
-      toast.error(`Total amount (${formatCurrency(editFormData.totalAmount)}) cannot be less than already paid amount (${formatCurrency(editingOrder.paidAmount || 0)})`);
+    if (totalAmount < (editingOrder.paidAmount || 0)) {
+      toast.error(`Total amount (${formatCurrency(totalAmount)}) cannot be less than already paid amount (${formatCurrency(editingOrder.paidAmount || 0)})`);
       return;
     }
 
@@ -551,21 +638,6 @@ export default function Orders() {
                 </div>
               </div>
               <div>
-                <Label htmlFor="orderCategory">Order Category</Label>
-                <Select value={formData.orderCategory} onValueChange={(value) => setFormData({ ...formData, orderCategory: value })}>
-                  <SelectTrigger>
-                    <SelectValue placeholder="Select order category" />
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="Bleach Card Umer">Bleach Card Umer</SelectItem>
-                    <SelectItem value="Other Bleach Card">Other Bleach Card</SelectItem>
-                    <SelectItem value="Standard Order">Standard Order</SelectItem>
-                    <SelectItem value="Custom Order">Custom Order</SelectItem>
-                    <SelectItem value="Bulk Order">Bulk Order</SelectItem>
-                  </SelectContent>
-                </Select>
-              </div>
-              <div>
                 <Label htmlFor="status">Status</Label>
                 <Select value={formData.status} onValueChange={(value) => setFormData({ ...formData, status: value })}>
                   <SelectTrigger>
@@ -728,13 +800,6 @@ export default function Orders() {
                         <p className="text-xs sm:text-sm text-muted-foreground mt-1 truncate">
                           Leader: {order.leaderName || 'N/A'}
                         </p>
-                        {order.orderCategory && order.orderCategory !== 'Standard Order' && (
-                          <p className="text-xs text-muted-foreground mt-1">
-                            <span className="inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium bg-indigo-100 text-indigo-800">
-                              {order.orderCategory}
-                            </span>
-                          </p>
-                        )}
                       </div>
                     </div>
                     <Badge variant={getStatusColor(order.status)} className="text-xs flex-shrink-0 self-start sm:self-center">
@@ -941,21 +1006,118 @@ export default function Orders() {
                 required
               />
             </div>
-            <div>
-              <Label htmlFor="edit-totalAmount">Total Amount *</Label>
-              <Input
-                id="edit-totalAmount"
-                type="number"
-                step="0.01"
-                value={editFormData.totalAmount}
-                onChange={(e) => setEditFormData({ ...editFormData, totalAmount: parseFloat(e.target.value) || 0 })}
-                required
-              />
-              {editingOrder && editingOrder.paidAmount > 0 && (
-                <p className="text-xs text-muted-foreground mt-1">
-                  Already paid: {formatCurrency(editingOrder.paidAmount || 0)}
-                </p>
-              )}
+            <div className="space-y-4">
+              <div className="flex justify-between items-center">
+                <Label className="text-base font-semibold">Order Items *</Label>
+                <Button type="button" variant="outline" size="sm" onClick={addEditItem}>
+                  <Plus className="w-4 h-4 mr-1" /> Add Item
+                </Button>
+              </div>
+
+              {editFormData.items.map((item, index) => (
+                <Card key={index} className="p-4 bg-slate-50">
+                  <div className="space-y-3">
+                    <div className="flex justify-between items-center mb-2">
+                      <span className="text-sm font-medium text-slate-700">Item {index + 1}</span>
+                      {editFormData.items.length > 1 && (
+                        <Button
+                          type="button"
+                          variant="destructive"
+                          size="sm"
+                          onClick={() => removeEditItem(index)}
+                        >
+                          <Trash2 className="w-4 h-4" />
+                        </Button>
+                      )}
+                    </div>
+
+                    <div>
+                      <Label htmlFor={`edit-item-desc-${index}`}>Item Description *</Label>
+                      <Input
+                        id={`edit-item-desc-${index}`}
+                        value={item.itemDescription}
+                        onChange={(e) => updateEditItem(index, 'itemDescription', e.target.value)}
+                        placeholder="e.g., Copy, Register, Diary"
+                        required
+                      />
+                    </div>
+
+                    <div className="grid grid-cols-2 gap-3">
+                      <div>
+                        <Label htmlFor={`edit-item-qty-${index}`}>Quantity *</Label>
+                        <Input
+                          id={`edit-item-qty-${index}`}
+                          type="number"
+                          min="1"
+                          value={item.quantity}
+                          onChange={(e) => updateEditItem(index, 'quantity', parseInt(e.target.value) || 1)}
+                          required
+                        />
+                      </div>
+                      <div>
+                        <Label htmlFor={`edit-item-price-${index}`}>Unit Price *</Label>
+                        <Input
+                          id={`edit-item-price-${index}`}
+                          type="number"
+                          step="0.01"
+                          min="0"
+                          value={item.unitPrice}
+                          onChange={(e) => updateEditItem(index, 'unitPrice', parseFloat(e.target.value) || 0)}
+                          required
+                        />
+                      </div>
+                    </div>
+
+                    <div className="grid grid-cols-2 gap-3">
+                      <div>
+                        <Label htmlFor={`edit-item-pages-${index}`}>Pages</Label>
+                        <Input
+                          id={`edit-item-pages-${index}`}
+                          type="number"
+                          min="0"
+                          value={item.pages}
+                          onChange={(e) => updateEditItem(index, 'pages', parseInt(e.target.value) || 0)}
+                          placeholder="Optional"
+                        />
+                      </div>
+                      <div>
+                        <Label htmlFor={`edit-item-paper-${index}`}>Paper</Label>
+                        <Input
+                          id={`edit-item-paper-${index}`}
+                          type="text"
+                          maxLength={200}
+                          value={item.paper}
+                          onChange={(e) => updateEditItem(index, 'paper', e.target.value)}
+                          placeholder="e.g., A4 80gsm"
+                        />
+                      </div>
+                    </div>
+
+                    <div className="pt-2 border-t">
+                      <div className="flex justify-between items-center">
+                        <span className="text-sm text-slate-600">Item Total:</span>
+                        <span className="text-base font-semibold text-blue-600">
+                          {formatCurrency(item.totalPrice)}
+                        </span>
+                      </div>
+                    </div>
+                  </div>
+                </Card>
+              ))}
+
+              <div className="p-4 bg-blue-50 rounded-lg border-2 border-blue-200">
+                <div className="flex justify-between items-center">
+                  <span className="text-lg font-bold text-blue-900">Order Total:</span>
+                  <span className="text-xl font-bold text-blue-600">
+                    {formatCurrency(calculateEditTotal())}
+                  </span>
+                </div>
+                {editingOrder && editingOrder.paidAmount > 0 && (
+                  <p className="text-right text-xs text-muted-foreground mt-1">
+                    Already paid: {formatCurrency(editingOrder.paidAmount || 0)}
+                  </p>
+                )}
+              </div>
             </div>
             <div>
               <Label htmlFor="edit-status">Status</Label>
@@ -972,19 +1134,6 @@ export default function Orders() {
               </Select>
             </div>
             <div>
-              <Label htmlFor="edit-orderCategory">Order Category</Label>
-              <Select value={editFormData.orderCategory} onValueChange={(value) => setEditFormData({ ...editFormData, orderCategory: value })}>
-                <SelectTrigger>
-                  <SelectValue placeholder="Select order category" />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="Bleach Card Umer">Bleach Card Umer</SelectItem>
-                  <SelectItem value="Other Bleach Card">Other Bleach Card</SelectItem>
-                  <SelectItem value="Standard Order">Standard Order</SelectItem>
-                  <SelectItem value="Custom Order">Custom Order</SelectItem>
-                  <SelectItem value="Bulk Order">Bulk Order</SelectItem>
-                </SelectContent>
-              </Select>
             </div>
             <div>
               <Label htmlFor="edit-pages">Pages</Label>

@@ -40,6 +40,14 @@ const PAYMENT_METHODS = [
   'Check'
 ];
 
+const ORDER_CATEGORIES = [
+  'Bleach Card Umer',
+  'Other Bleach Card',
+  'Standard Order',
+  'Custom Order',
+  'Bulk Order'
+];
+
 export default function Expenses() {
   const [dialogOpen, setDialogOpen] = useState(false);
   const [editingExpense, setEditingExpense] = useState<Expense | null>(null);
@@ -55,7 +63,8 @@ export default function Expenses() {
     description: '',
     expenseDate: new Date().toISOString().split('T')[0],
     paymentMethod: 'Cash',
-    referenceNumber: ''
+    referenceNumber: '',
+    orderCategory: 'Standard Order'
   });
 
   const {
@@ -147,7 +156,8 @@ export default function Expenses() {
         description: '',
         expenseDate: new Date().toISOString().split('T')[0],
         paymentMethod: 'Cash',
-        referenceNumber: ''
+        referenceNumber: '',
+        orderCategory: 'Standard Order'
       });
       refetchExpenses();
     } catch (error: any) {
@@ -164,7 +174,8 @@ export default function Expenses() {
       description: expense.description,
       expenseDate: expense.expenseDate.split('T')[0],
       paymentMethod: expense.paymentMethod || 'Cash',
-      referenceNumber: expense.referenceNumber || ''
+      referenceNumber: expense.referenceNumber || '',
+      orderCategory: expense.orderCategory || 'Standard Order'
     });
     setDialogOpen(true);
   };
@@ -194,7 +205,8 @@ export default function Expenses() {
         description: '',
         expenseDate: new Date().toISOString().split('T')[0],
         paymentMethod: 'Cash',
-        referenceNumber: ''
+        referenceNumber: '',
+        orderCategory: 'Standard Order'
       });
     }
   };
@@ -262,7 +274,7 @@ export default function Expenses() {
                 <Label htmlFor="category">Category</Label>
                 <Select
                   value={formData.category}
-                  onValueChange={(value) => setFormData({ ...formData, category: value })}
+                  onValueChange={(value) => setFormData({ ...formData, category: value as ExpenseCategory })}
                 >
                   <SelectTrigger>
                     <SelectValue placeholder="Select category" />
@@ -288,6 +300,25 @@ export default function Expenses() {
                   onChange={(e) => setFormData({ ...formData, amount: parseFloat(e.target.value) || 0 })}
                   required
                 />
+              </div>
+
+              <div>
+                <Label htmlFor="orderCategory">Order Category</Label>
+                <Select
+                  value={formData.orderCategory}
+                  onValueChange={(value) => setFormData({ ...formData, orderCategory: value })}
+                >
+                  <SelectTrigger>
+                    <SelectValue placeholder="Select order category" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {ORDER_CATEGORIES.map((cat) => (
+                      <SelectItem key={cat} value={cat}>
+                        {cat}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
               </div>
 
               <div>
@@ -409,6 +440,11 @@ export default function Expenses() {
                     {expense.paymentMethod && (
                       <Badge variant="outline" className={`${getPaymentMethodBadge(expense.paymentMethod)} text-xs`}>
                         {expense.paymentMethod}
+                      </Badge>
+                    )}
+                    {expense.orderCategory && expense.orderCategory !== 'Standard Order' && (
+                      <Badge variant="outline" className="bg-indigo-100 text-indigo-700 text-xs">
+                        {expense.orderCategory}
                       </Badge>
                     )}
                   </div>
