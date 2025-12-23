@@ -98,7 +98,8 @@ export default function Orders() {
         totalPrice: 0
       }
     ],
-    details: ''
+    details: '',
+    amountReceived: 0
   });
 
   const {
@@ -371,7 +372,8 @@ export default function Orders() {
       orderDate: order.orderDate ? new Date(order.orderDate).toISOString().split('T')[0] : '',
       status: order.status,
       items: items,
-      details: order.details || ''
+      details: order.details || '',
+      amountReceived: (order as any).amountReceived || 0
     });
     setEditDialogOpen(true);
   };
@@ -1134,28 +1136,17 @@ export default function Orders() {
               </Select>
             </div>
             <div>
-            </div>
-            <div>
-              <Label htmlFor="edit-pages">Pages</Label>
+              <Label htmlFor="edit-amountReceived">Amount Received</Label>
               <Input
-                id="edit-pages"
+                id="edit-amountReceived"
                 type="number"
                 min="0"
-                value={editFormData.pages}
-                onChange={(e) => setEditFormData({ ...editFormData, pages: parseInt(e.target.value) || 0 })}
-                placeholder="Number of pages"
+                step="0.01"
+                value={editFormData.amountReceived}
+                onChange={(e) => setEditFormData({ ...editFormData, amountReceived: parseFloat(e.target.value) || 0 })}
+                placeholder="Enter amount received"
               />
-            </div>
-            <div>
-              <Label htmlFor="edit-paper">Paper Specification</Label>
-              <Input
-                id="edit-paper"
-                type="text"
-                maxLength={200}
-                value={editFormData.paper}
-                onChange={(e) => setEditFormData({ ...editFormData, paper: e.target.value })}
-                placeholder="e.g., A4 80gsm"
-              />
+              <p className="text-xs text-muted-foreground mt-1">Initial payment or amount received for this order</p>
             </div>
             <div>
               <Label htmlFor="edit-details">Order Details</Label>
