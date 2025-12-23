@@ -136,6 +136,10 @@ class Order(OrderBase, table=True):
     # Order category
     order_category: Optional[str] = Field(default="Standard Order")
     
+    # Product specifications
+    pages: Optional[int] = Field(default=None)
+    paper: Optional[str] = Field(default=None)
+    
     # Ensure client relationship is properly loaded
     client: "Client" = Relationship(
         back_populates="orders",
@@ -159,6 +163,9 @@ class OrderCreate(SQLModel):
     details: Optional[str] = None
     # Order category
     orderCategory: Optional[str] = "Standard Order"
+    # Product specifications
+    pages: Optional[int] = None
+    paper: Optional[str] = None
 
 class OrderRead(SQLModel):
     id: UUID
@@ -173,6 +180,8 @@ class OrderRead(SQLModel):
     leaderName: Optional[str] = None
     details: Optional[str] = PydanticField(None, alias="details")
     orderCategory: Optional[str] = PydanticField("Standard Order", alias="order_category")
+    pages: Optional[int] = PydanticField(None, alias="pages")
+    paper: Optional[str] = PydanticField(None, alias="paper")
 
     class Config:
         from_attributes = True

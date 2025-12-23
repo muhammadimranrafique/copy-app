@@ -72,7 +72,9 @@ def get_orders(
                     createdAt=order.created_at,      # Use the frontend field name
                     leaderName=order.client.name if order.client else None,
                     details=order.details,           # Include order details
-                    orderCategory=order.order_category  # Include order category
+                    orderCategory=order.order_category,  # Include order category
+                    pages=order.pages,               # Include pages
+                    paper=order.paper                # Include paper
                 )
                 response_orders.append(order_data)
             except Exception as e:
@@ -130,6 +132,30 @@ def create_order(
         # Extract order category
         order_category = order_dict.pop('orderCategory', 'Standard Order')
         
+        # Extract and validate pages field
+        pages = order_dict.pop('pages', None)
+        if pages is not None:
+            try:
+                pages = int(pages)
+                if pages < 0:
+                    raise HTTPException(
+                        status_code=status.HTTP_400_BAD_REQUEST,
+                        detail="Pages must be a positive number"
+                    )
+            except (ValueError, TypeError):
+                raise HTTPException(
+                    status_code=status.HTTP_400_BAD_REQUEST,
+                    detail="Pages must be a valid number"
+                )
+        
+        # Extract and validate paper field
+        paper = order_dict.pop('paper', None)
+        if paper and len(paper) > 200:
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail="Paper specification cannot exceed 200 characters"
+            )
+        
         if 'orderNumber' in order_dict:
             order_dict['order_number'] = order_dict.pop('orderNumber')
         if 'leaderId' in order_dict:
@@ -137,11 +163,15 @@ def create_order(
         if 'totalAmount' in order_dict:
             order_dict['total_amount'] = order_dict.pop('totalAmount')
         
-        # Add details and category to order_dict
+        # Add details, category, pages, and paper to order_dict
         if details is not None:
             order_dict['details'] = details
         if order_category is not None:
             order_dict['order_category'] = order_category
+        if pages is not None:
+            order_dict['pages'] = pages
+        if paper is not None:
+            order_dict['paper'] = paper
         
         # Validate initial payment
         initial_payment = float(initial_payment) if initial_payment else 0.0
@@ -271,6 +301,30 @@ def update_order(
                 detail="Order details cannot exceed 2000 characters"
             )
         
+        # Extract and validate pages field
+        pages = order_dict.pop('pages', None)
+        if pages is not None:
+            try:
+                pages = int(pages)
+                if pages < 0:
+                    raise HTTPException(
+                        status_code=status.HTTP_400_BAD_REQUEST,
+                        detail="Pages must be a positive number"
+                    )
+            except (ValueError, TypeError):
+                raise HTTPException(
+                    status_code=status.HTTP_400_BAD_REQUEST,
+                    detail="Pages must be a valid number"
+                )
+        
+        # Extract and validate paper field
+        paper = order_dict.pop('paper', None)
+        if paper and len(paper) > 200:
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail="Paper specification cannot exceed 200 characters"
+            )
+        
         # Map frontend camelCase to backend snake_case
         if 'orderNumber' in order_dict:
             order_dict['order_number'] = order_dict.pop('orderNumber')
@@ -278,6 +332,8 @@ def update_order(
             order_dict['client_id'] = order_dict.pop('leaderId')
         if 'totalAmount' in order_dict:
             order_dict['total_amount'] = order_dict.pop('totalAmount')
+        if 'orderCategory' in order_dict:
+            order_dict['order_category'] = order_dict.pop('orderCategory')
         
         # Remove payment-related fields from update (these should not be modified via edit)
         order_dict.pop('initialPayment', None)
@@ -320,9 +376,13 @@ def update_order(
             if hasattr(order, key):
                 setattr(order, key, value)
         
-        # Update details separately if provided
+        # Update details, pages, and paper separately if provided
         if details is not None:
             order.details = details
+        if pages is not None:
+            order.pages = pages
+        if paper is not None:
+            order.paper = paper
         
         session.add(order)
         session.commit()
@@ -518,7 +578,9 @@ def generate_invoice(
         "total_amount": float(order.total_amount),  # Explicit float conversion
         "paid_amount": float(order.paid_amount),    # Required for payment summary
         "balance": float(order.balance),            # Required for payment summary
-        "status": order.status
+        "status": order.status,
+        "pages": order.pages,                       # Include pages for invoice
+        "paper": order.paper                        # Include paper for invoice
     }
     
     client_dict = {
