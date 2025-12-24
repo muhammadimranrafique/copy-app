@@ -17,7 +17,7 @@ export const queryClient = new QueryClient({
   defaultOptions: {
     queries: {
       staleTime: 5 * 60 * 1000, // Consider data stale after 5 minutes
-      cacheTime: 30 * 60 * 1000, // Keep unused data in cache for 30 minutes
+      gcTime: 30 * 60 * 1000, // Keep unused data in cache for 30 minutes
       retry: (failureCount, error: any) => {
         // Don't retry on 404s or auth errors
         if (error.status === 404 || error.status === 401 || error.status === 403) {
@@ -132,7 +132,7 @@ class ApiClient {
     try {
       const response = await fetch(url, { ...init, headers });
       return await this.handleResponse<T>(response);
-    } catch (error) {
+    } catch (error: any) {
       if (error instanceof ApiError) {
         throw error;
       }
@@ -209,8 +209,8 @@ class ApiClient {
     return { success: true, data: response };
   }
 
-  async getLeaderLedger(leaderId: string): Promise<any[]> {
-    return await this.fetchJson<any[]>(`/leaders/${leaderId}/ledger`);
+  async getLeaderLedger(leaderId: string): Promise<any> {
+    return await this.fetchJson<any>(`/leaders/${leaderId}/ledger`);
   }
 
   async getOrdersByLeader(leaderId: string): Promise<any[]> {
@@ -231,6 +231,38 @@ class ApiClient {
     return await this.fetchJson<Settings>('/settings/', {
       method: 'PUT',
       body: JSON.stringify(data),
+    });
+  }
+  async downloadPaymentReceipt(paymentId: string): Promise<void> {
+    const token = localStorage.getItem('access_token');
+    const response = await fetch(`${API_BASE}/payments/${paymentId}/receipt`, {
+      method: 'POST',
+      headers: {
+        'Authorization': `Bearer ${token}`,
+      },
+    });
+    if (!response.ok) throw new Error('Failed to download receipt');
+    const blob = await response.blob();
+    const url = window.URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = `receipt-${paymentId}.pdf`;
+    document.body.appendChild(a);
+    a.click();
+    window.URL.revokeObjectURL(url);
+    document.body.removeChild(a);
+  }
+
+  async updatePayment(paymentId: string, data: any): Promise<any> {
+    return this.fetchJson<any>(`/payments/${paymentId}`, {
+      method: 'PUT',
+      body: JSON.stringify(data),
+    });
+  }
+
+  async deletePayment(paymentId: string): Promise<void> {
+    await this.fetchJson<void>(`/payments/${paymentId}`, {
+      method: 'DELETE',
     });
   }
 }

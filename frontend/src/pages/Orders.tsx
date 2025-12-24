@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { Plus, ShoppingCart, Receipt, DollarSign, Eye, Download, Edit2, Trash2 } from 'lucide-react';
+import { Plus, ShoppingCart, DollarSign, Eye, Download, Edit2, Trash2 } from 'lucide-react';
 import { PaymentHistory } from '@/components/PaymentHistory';
 import { useCurrency } from '@/hooks/useCurrency';
 import { useAuth } from '@/lib/useAuth';
@@ -45,11 +45,6 @@ interface Order {
   items?: OrderItem[];
 }
 
-interface Leader {
-  id: string;
-  name: string;
-  type: string;
-}
 
 export default function Orders() {
   const { formatCurrency } = useCurrency();
@@ -513,7 +508,7 @@ export default function Orders() {
                     <SelectValue placeholder="Select a leader" />
                   </SelectTrigger>
                   <SelectContent>
-                    {leaders.map((leader) => (
+                    {leaders.map((leader: any) => (
                       <SelectItem key={leader.id} value={leader.id}>
                         {leader.name} ({leader.type})
                       </SelectItem>
@@ -687,8 +682,8 @@ export default function Orders() {
                   </div>
 
                   {/* Remaining Balance Display */}
-                  {formData.totalAmount > 0 && (
-                    <div className={`p-4 rounded-lg border-2 ${formData.initialPayment >= formData.totalAmount
+                  {calculateTotal() > 0 && (
+                    <div className={`p-4 rounded-lg border-2 ${formData.initialPayment >= calculateTotal()
                       ? 'bg-green-50 border-green-300'
                       : formData.initialPayment > 0
                         ? 'bg-orange-50 border-orange-300'
@@ -697,7 +692,7 @@ export default function Orders() {
                       <div className="space-y-2">
                         <div className="flex justify-between text-sm">
                           <span className="text-muted-foreground">Total Amount:</span>
-                          <span className="font-semibold">{formatCurrency(formData.totalAmount)}</span>
+                          <span className="font-semibold">{formatCurrency(calculateTotal())}</span>
                         </div>
                         <div className="flex justify-between text-sm">
                           <span className="text-muted-foreground">Initial Payment:</span>
@@ -708,32 +703,32 @@ export default function Orders() {
                         <div className="border-t pt-2">
                           <div className="flex justify-between">
                             <span className="font-medium">Remaining Balance:</span>
-                            <span className={`text-xl font-bold ${formData.initialPayment >= formData.totalAmount
+                            <span className={`text-xl font-bold ${formData.initialPayment >= calculateTotal()
                               ? 'text-green-600'
                               : formData.initialPayment > 0
                                 ? 'text-orange-600'
                                 : 'text-blue-600'
                               }`}>
-                              {formatCurrency(formData.totalAmount - formData.initialPayment)}
+                              {formatCurrency(calculateTotal() - formData.initialPayment)}
                             </span>
                           </div>
                           {/* Progress Bar */}
                           <div className="mt-2 w-full bg-gray-200 rounded-full h-2">
                             <div
-                              className={`h-2 rounded-full transition-all ${formData.initialPayment >= formData.totalAmount
+                              className={`h-2 rounded-full transition-all ${formData.initialPayment >= calculateTotal()
                                 ? 'bg-green-600'
                                 : 'bg-orange-500'
                                 }`}
                               style={{
-                                width: `${Math.min((formData.initialPayment / formData.totalAmount) * 100, 100)}%`
+                                width: `${Math.min((formData.initialPayment / calculateTotal()) * 100, 100)}%`
                               }}
                             />
                           </div>
                           <p className="text-xs text-muted-foreground mt-1 text-center">
-                            {formData.initialPayment >= formData.totalAmount
+                            {formData.initialPayment >= calculateTotal()
                               ? '✓ Fully Paid'
                               : formData.initialPayment > 0
-                                ? `${((formData.initialPayment / formData.totalAmount) * 100).toFixed(1)}% Paid`
+                                ? `${((formData.initialPayment / calculateTotal()) * 100).toFixed(1)}% Paid`
                                 : 'No payment yet'}
                           </p>
                         </div>
@@ -784,7 +779,7 @@ export default function Orders() {
         </div>
       ) : (
         <div className="space-y-3 sm:space-y-4">
-          {orders.map((order) => (
+          {orders.map((order: any) => (
             <Card key={order.id} className="card-hover">
               <CardContent className="p-4 sm:p-6">
                 <div className="flex flex-col gap-4">
@@ -929,7 +924,7 @@ export default function Orders() {
             <DialogTitle>Payment History</DialogTitle>
           </DialogHeader>
           {selectedOrderId ? (() => {
-            const selectedOrder = orders.find(o => o.id === selectedOrderId);
+            const selectedOrder = orders.find((o: any) => o.id === selectedOrderId);
 
             if (!selectedOrder) {
               console.error('[Orders] Selected order not found:', selectedOrderId);
@@ -990,7 +985,7 @@ export default function Orders() {
                   <SelectValue placeholder="Select a leader" />
                 </SelectTrigger>
                 <SelectContent>
-                  {leaders.map((leader) => (
+                  {leaders.map((leader: any) => (
                     <SelectItem key={leader.id} value={leader.id}>
                       {leader.name} ({leader.type})
                     </SelectItem>
@@ -1114,7 +1109,7 @@ export default function Orders() {
                     {formatCurrency(calculateEditTotal())}
                   </span>
                 </div>
-                {editingOrder && editingOrder.paidAmount > 0 && (
+                {editingOrder && (editingOrder.paidAmount || 0) > 0 && (
                   <p className="text-right text-xs text-muted-foreground mt-1">
                     Already paid: {formatCurrency(editingOrder.paidAmount || 0)}
                   </p>

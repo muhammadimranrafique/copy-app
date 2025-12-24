@@ -124,18 +124,6 @@ export async function getOrders(params: any) {
     const orders = Array.isArray(res) ? res : (res?.orders ?? []);
 
     // Define order type for proper typing
-    type OrderResponse = {
-      id: string;
-      orderNumber: string;
-      leaderId: string;
-      leaderName?: string;
-      totalAmount: number;
-      paidAmount: number;
-      balance: number;
-      status: string;
-      orderDate: string;
-      createdAt: string;
-    };
 
     // Debug logging
     if (import.meta.env.VITE_DEBUG === 'true') {

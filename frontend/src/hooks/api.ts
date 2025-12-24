@@ -1,5 +1,5 @@
 import { useQuery, useMutation, UseQueryOptions, UseMutationOptions } from '@tanstack/react-query';
-import { api } from './api-client';
+import { api } from '../lib/api-client';
 import type {
   Leader,
   Order,
@@ -9,7 +9,7 @@ import type {
   QueryParams,
   ApiResponse,
   ListResponse,
-} from './api-types';
+} from '../lib/api-types';
 
 // Leaders
 export const useLeaders = (

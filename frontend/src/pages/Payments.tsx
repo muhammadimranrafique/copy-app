@@ -1,10 +1,7 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { Plus, DollarSign, Download, Banknote, CreditCard, Receipt, Smartphone, Building2, User, School, Pencil, Trash2 } from 'lucide-react';
 import { api } from '@/lib/api-client';
-import { useEffect } from 'react';
-import { useCurrency } from '@/hooks/useCurrency';
 import { useAuth } from '@/lib/useAuth';
-import { getPayments, createPayment, getLeaders, downloadPaymentReceipt, updatePayment, deletePayment } from '@/lib/mock-api';
 import { useAuthenticatedQuery } from '@/hooks/useAuthenticatedQuery';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -17,24 +14,9 @@ import { toast } from 'sonner';
 import { Badge } from '@/components/ui/badge';
 import { format } from 'date-fns';
 
-interface Payment {
-  id: string;
-  amount: number;
-  method: string;
-  paymentDate: string;
-  leaderId: string;
-  referenceNumber?: string;
-}
-
-interface Leader {
-  id: string;
-  name: string;
-  type: string;
-}
 
 export default function Payments() {
   const [dialogOpen, setDialogOpen] = useState(false);
-  const { formatCurrency } = useCurrency();
   const { user, isLoading: authLoading } = useAuth();
   const [formData, setFormData] = useState({
     amount: 0,
@@ -102,7 +84,7 @@ export default function Payments() {
     loading: paymentsLoading,
     refetch: refetchPayments
   } = useAuthenticatedQuery(
-    () => getPayments({}),
+    () => api.getPayments({}),
     {
       isReady: !authLoading && !!user,
       onError: () => toast.error('Failed to load payments')
@@ -113,15 +95,15 @@ export default function Payments() {
     data: leadersData,
     loading: leadersLoading
   } = useAuthenticatedQuery(
-    () => getLeaders({}),
+    () => api.getLeaders({}),
     {
       isReady: !authLoading && !!user,
       onError: () => toast.error('Failed to load leaders')
     }
   );
 
-  const payments = paymentsData?.payments ?? [];
-  const leaders = leadersData?.leaders ?? [];
+  const payments = paymentsData?.items ?? [];
+  const leaders = leadersData?.items ?? [];
   const loading = paymentsLoading || leadersLoading;
 
   const handleSubmit = async (e: React.FormEvent) => {
@@ -142,7 +124,7 @@ export default function Payments() {
     }
 
     try {
-      const result = await createPayment({
+      const result = await api.createPayment({
         ...formData,
         amount: Number(formData.amount),
         paymentDate: formData.paymentDate ? new Date(formData.paymentDate).toISOString() : undefined,
@@ -197,7 +179,7 @@ export default function Payments() {
   const handleDownloadReceipt = async (paymentId: string) => {
     try {
       toast.loading('Generating receipt...', { id: 'download-receipt' });
-      await downloadPaymentReceipt(paymentId);
+      await api.downloadPaymentReceipt(paymentId);
       toast.success('Receipt downloaded successfully', { id: 'download-receipt' });
     } catch (error: any) {
       console.error('Receipt download error:', error);
@@ -227,7 +209,7 @@ export default function Payments() {
 
     try {
       setEditLoading(true);
-      await updatePayment(editingPayment.id, editFormData);
+      await api.updatePayment(editingPayment.id, editFormData);
       toast.success('Payment updated successfully');
       setEditDialogOpen(false);
       setEditingPayment(null);
@@ -252,7 +234,7 @@ export default function Payments() {
 
     try {
       setDeleteLoading(true);
-      await deletePayment(deletingPayment.id);
+      await api.deletePayment(deletingPayment.id);
       toast.success('Payment deleted successfully');
       setDeleteDialogOpen(false);
       setDeletingPayment(null);
@@ -293,7 +275,7 @@ export default function Payments() {
                     <SelectValue placeholder="Select a leader" />
                   </SelectTrigger>
                   <SelectContent>
-                    {leaders.map((leader) => (
+                    {leaders.map((leader: any) => (
                       <SelectItem key={leader.id} value={leader.id}>
                         {leader.name} ({leader.type})
                       </SelectItem>
@@ -477,7 +459,7 @@ export default function Payments() {
         </div>
       ) : (
         <div className="space-y-4">
-          {payments.map((payment) => {
+          {payments.map((payment: any) => {
             return (
               <Card key={payment.id} className="card-hover border-l-4 border-l-green-500 shadow-sm hover:shadow-md transition-all duration-200">
                 <CardContent className="p-6">

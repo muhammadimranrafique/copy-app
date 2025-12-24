@@ -56,7 +56,10 @@ export default function Leaders() {
     }
   );
 
-  const leaders = leadersData?.items ?? [];
+  const leaders: Leader[] = (leadersData?.items ?? []).map((leader: any) => ({
+    ...leader,
+    opening_balance: leader.opening_balance ?? leader.openingBalance ?? 0
+  }));
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();

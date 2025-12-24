@@ -1,5 +1,7 @@
 from pydantic_settings import BaseSettings
+from pydantic import model_validator
 from functools import lru_cache
+from typing import List, Union
 
 class Settings(BaseSettings):
     # Database
@@ -19,13 +21,19 @@ class Settings(BaseSettings):
     
     # Application
     debug: bool = True
-    allowed_origins: list = [
+    allowed_origins: Union[List[str], str] = [
         "http://localhost:5173",
         "http://localhost:5174",
         "http://127.0.0.1:5173",
         "http://127.0.0.1:5174",
         "http://localhost:3000"
     ]
+
+    @model_validator(mode='after')
+    def assemble_cors_origins(self) -> 'Settings':
+        if isinstance(self.allowed_origins, str):
+            self.allowed_origins = [i.strip() for i in self.allowed_origins.split(",")]
+        return self
     
     # Company Info
     company_name: str = "School Copy Manufacturing"

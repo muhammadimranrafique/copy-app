@@ -6,6 +6,7 @@ export interface Leader {
   contact: string;
   address: string;
   openingBalance: number;
+  opening_balance: number;
 }
 
 export interface Order {
