@@ -11,8 +11,6 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from 
 import { Label } from '@/components/ui/label';
 import { toast } from 'sonner';
 import { Badge } from '@/components/ui/badge';
-import { LoadingSpinner } from '@/components/LoadingSpinner';
-import { ErrorBoundary } from '@/components/ErrorBoundary';
 
 interface Product {
   id: string;
@@ -40,7 +38,6 @@ export default function Products() {
   const {
     data: productsData,
     loading,
-    error,
     refetch: loadProducts
   } = useAuthenticatedQuery(
     () => getProducts({}),
@@ -56,17 +53,17 @@ export default function Products() {
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    
+
     if (!formData.productName.trim()) {
       toast.error('Please enter a product name');
       return;
     }
-    
+
     if (formData.salePrice <= 0) {
       toast.error('Sale price must be greater than 0');
       return;
     }
-    
+
     try {
       await createProduct(formData);
       toast.success('Product created successfully');
@@ -172,10 +169,10 @@ export default function Products() {
         </div>
       ) : (
         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-3 sm:gap-4">
-          {products.map((product) => {
+          {products.map((product: Product) => {
             const profit = (product.salePrice || 0) - (product.costPrice || 0);
             const profitMargin = product.costPrice ? ((profit / product.costPrice) * 100).toFixed(1) : 0;
-            
+
             return (
               <Card key={product.id} className="card-hover">
                 <CardHeader className="pb-3">
