@@ -6,7 +6,7 @@ $backendDir = Join-Path $root 'backend'
 $frontendDir = Join-Path $root 'frontend'
 
 Write-Host "Starting backend in new PowerShell window..."
-$backendCmd = "cd `"$backendDir`"; if (Test-Path .\\venv\\Scripts\\Activate) { .\\venv\\Scripts\\Activate }; `".\\venv\\Scripts\\python.exe`" -m uvicorn main:app --reload --reload-dir `"$backendDir`" --host 127.0.0.1 --port 8000 --log-level info"
+$backendCmd = "cd `"$backendDir`"; if (Test-Path .\\venv\\Scripts\\Activate) { .\\venv\\Scripts\\Activate }; `".\\venv\\Scripts\\python.exe`" -m uvicorn main:app --reload --reload-dir `"$backendDir`" --host 127.0.0.1 --port 8080 --log-level info"
 Start-Process powershell -ArgumentList "-NoExit","-Command","$backendCmd"
 
 Start-Sleep -Seconds 1
