@@ -22,8 +22,8 @@ COPY . .
 # Create directories for invoices
 RUN mkdir -p /app/invoices
 
-# Expose port
-EXPOSE 8000
+# Expose port (railway will provide PORT env var)
+EXPOSE 8080
 
-# Run the application
-CMD ["uvicorn", "main:app", "--host", "0.0.0.0", "--port", "8000"]
+# Run the application using shell form to expand environment variables
+CMD ["sh", "-c", "uvicorn main:app --host 0.0.0.0 --port ${PORT:-8080}"]

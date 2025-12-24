@@ -1,4 +1,4 @@
-from pydantic_settings import BaseSettings
+from pydantic_settings import BaseSettings, SettingsConfigDict
 from pydantic import model_validator
 from functools import lru_cache
 from typing import List, Union
@@ -20,7 +20,7 @@ class Settings(BaseSettings):
     redis_url: str = "redis://localhost:6379/0"
     
     # Application
-    debug: bool = True
+    debug: bool = False
     allowed_origins: Union[List[str], str] = [
         "http://localhost:5173",
         "http://localhost:5174",
@@ -28,6 +28,8 @@ class Settings(BaseSettings):
         "http://127.0.0.1:5174",
         "http://localhost:3000"
     ]
+
+    model_config = SettingsConfigDict(env_file=".env", case_sensitive=False, extra='ignore')
 
     @model_validator(mode='after')
     def assemble_cors_origins(self) -> 'Settings':
@@ -44,10 +46,6 @@ class Settings(BaseSettings):
     # File Uploads
     invoice_dir: str = "./invoices"
     max_upload_size: int = 10485760
-    
-    class Config:
-        env_file = ".env"
-        case_sensitive = False
 
 @lru_cache()
 def get_settings():
