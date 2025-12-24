@@ -5,7 +5,7 @@ import { useAuth } from '@/lib/useAuth';
 import { Button } from '@/components/ui/button';
 import { Avatar, AvatarFallback } from '@/components/ui/avatar';
 import { useState, useEffect } from 'react';
-import { api } from '@/lib/api-client';
+import { useSettings } from '@/hooks/api';
 
 const navItems = [
   { path: '/', label: 'Dashboard', icon: LayoutDashboard },
@@ -22,22 +22,8 @@ export default function Layout({ children }: { children: React.ReactNode }) {
   const location = useLocation();
   const { user, logout } = useAuth();
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
-  const [companyName, setCompanyName] = useState('SchoolCopy');
-
-  // Fetch company settings
-  useEffect(() => {
-    const fetchSettings = async () => {
-      try {
-        const settings = await api.getSettings();
-        if (settings?.company_name) {
-          setCompanyName(settings.company_name);
-        }
-      } catch (error) {
-        console.error('Failed to load company settings:', error);
-      }
-    };
-    fetchSettings();
-  }, []);
+  const { data: settings } = useSettings();
+  const companyName = settings?.company_name || 'SchoolCopy';
 
   // Close mobile menu on route change
   useEffect(() => {

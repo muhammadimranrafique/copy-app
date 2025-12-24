@@ -125,6 +125,11 @@ export interface ApiResponse<T> {
   success: boolean;
   data: T;
   message?: string;
+  leader?: T;
+  order?: T;
+  product?: T;
+  payment?: T;
+  expense?: T;
 }
 
 export interface ListResponse<T> {

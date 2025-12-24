@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react';
 import { ShoppingCart, DollarSign, TrendingUp, TrendingDown } from 'lucide-react';
-import { api } from '@/lib/api-client';
+import { useDashboard } from '@/hooks/api';
 import StatCard from '@/components/StatCard';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
@@ -8,15 +8,15 @@ import { format } from 'date-fns';
 import { useCurrency } from '@/hooks/useCurrency';
 import WelcomeAlert from '@/components/WelcomeAlert';
 import { useAuth } from '@/lib/useAuth';
-import type { DashboardData } from '@/lib/api-types';
 
 export default function Dashboard() {
-  const [data, setData] = useState<DashboardData | null>(null);
-  const [loading, setLoading] = useState(true);
-  const [error, setError] = useState<string | null>(null);
   const [showWelcome, setShowWelcome] = useState(false);
   const { formatCurrency } = useCurrency();
   const { user, isLoading: authLoading } = useAuth();
+
+  const { data, isLoading: loading, error, refetch } = useDashboard(undefined, {
+    enabled: !!user && !authLoading
+  } as any);
 
   useEffect(() => {
     const hasSeenWelcome = localStorage.getItem('hasSeenWelcome');
@@ -25,28 +25,6 @@ export default function Dashboard() {
       localStorage.setItem('hasSeenWelcome', 'true');
     }
   }, []);
-
-  useEffect(() => {
-    if (!authLoading && user) {
-      loadDashboardData();
-    }
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [authLoading, user]);
-
-  const loadDashboardData = async () => {
-    if (!user) return;
-    try {
-      setLoading(true);
-      setError(null);
-      const result = await api.getDashboardData();
-      setData(result);
-    } catch (error) {
-      console.error('Error loading dashboard:', error);
-      setError(error instanceof Error ? error.message : 'Failed to load dashboard data');
-    } finally {
-      setLoading(false);
-    }
-  };
 
   if (authLoading || loading) {
     return (
@@ -69,9 +47,9 @@ export default function Dashboard() {
         <div className="text-center">
           <h1 className="text-2xl font-bold mb-4">Dashboard</h1>
           <div className="bg-destructive/10 border border-destructive/20 rounded-lg p-4">
-            <p className="text-destructive">Error loading dashboard: {error}</p>
-            <button 
-              onClick={loadDashboardData}
+            <p className="text-destructive">Error loading dashboard: {error instanceof Error ? error.message : 'Unknown error'}</p>
+            <button
+              onClick={() => refetch()}
               className="mt-2 px-4 py-2 bg-primary text-primary-foreground rounded hover:bg-primary/90"
             >
               Retry

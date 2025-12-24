@@ -106,3 +106,12 @@ export const useDashboard = (
     ...options,
   });
 };
+
+// Settings
+export const useSettings = (options?: UseQueryOptions<any>) => {
+  return useQuery({
+    queryKey: ['settings'],
+    queryFn: () => api.getSettings(),
+    ...options,
+  });
+};
