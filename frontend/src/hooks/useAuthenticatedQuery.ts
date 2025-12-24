@@ -1,5 +1,9 @@
-import { useEffect, useCallback, useState, useRef } from 'react';
+import { useQuery } from '@tanstack/react-query';
 
+/**
+ * A wrapper around React Query's useQuery that handles authentication state
+ * and provides a consistent interface for legacy components.
+ */
 export function useAuthenticatedQuery<T>(
   queryFn: () => Promise<T>,
   options?: {
@@ -8,70 +12,34 @@ export function useAuthenticatedQuery<T>(
     isReady?: boolean;
     retryCount?: number;
     retryDelay?: (attemptIndex: number) => number;
+    enabled?: boolean;
   }
 ) {
-  const [data, setData] = useState<T | null>(null);
-  const [loading, setLoading] = useState(true);
-  const [error, setError] = useState<Error | null>(null);
-  const mounted = useRef(true);
-  const optionsRef = useRef(options);
-  optionsRef.current = options;
+  const queryKey = [queryFn.toString()]; // Simple key based on function
 
-  // Stabilize the queryFn reference
-  const queryFnRef = useRef(queryFn);
-  queryFnRef.current = queryFn;
-
-  const execute = useCallback(async () => {
-    const currentOptions = optionsRef.current;
-    
-    if (currentOptions?.isReady === false) {
-      if (mounted.current) {
-        setLoading(false);
+  const { data, isLoading, error, refetch } = useQuery({
+    queryKey,
+    queryFn: async () => {
+      try {
+        const result = await queryFn();
+        options?.onSuccess?.(result);
+        return result;
+      } catch (err) {
+        const error = err instanceof Error ? err : new Error(String(err));
+        options?.onError?.(error);
+        throw error;
       }
-      return;
-    }
+    },
+    enabled: options?.isReady !== false && options?.enabled !== false,
+    retry: options?.retryCount ?? 3,
+    retryDelay: options?.retryDelay,
+    staleTime: 5 * 60 * 1000, // 5 minutes cache
+  });
 
-    try {
-      if (mounted.current) {
-        setLoading(true);
-        setError(null);
-      }
-      
-      const newData = await queryFnRef.current();
-      
-      // Only update state if component is still mounted
-      if (mounted.current) {
-        setData(newData);
-        currentOptions?.onSuccess?.(newData);
-      }
-    } catch (e) {
-      // Only update error state if component is still mounted
-      if (mounted.current) {
-        const err = e instanceof Error ? e : new Error(String(e));
-        setError(err);
-        currentOptions?.onError?.(err);
-      }
-    } finally {
-      // Only update loading state if component is still mounted
-      if (mounted.current) {
-        setLoading(false);
-      }
-    }
-  }, []); // No dependencies to prevent infinite re-renders
-
-  // Trigger execution when isReady changes
-  useEffect(() => {
-    if (options?.isReady !== false) {
-      execute();
-    }
-  }, [options?.isReady, execute]);
-
-  useEffect(() => {
-    mounted.current = true;
-    return () => {
-      mounted.current = false;
-    };
-  }, []);
-
-  return { data, loading, error, refetch: execute };
+  return {
+    data,
+    loading: isLoading,
+    error: error as Error | null,
+    refetch
+  };
 }

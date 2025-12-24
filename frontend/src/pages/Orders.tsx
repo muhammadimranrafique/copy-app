@@ -3,7 +3,7 @@ import { Plus, ShoppingCart, DollarSign, Eye, Download, Edit2, Trash2 } from 'lu
 import { PaymentHistory } from '@/components/PaymentHistory';
 import { useCurrency } from '@/hooks/useCurrency';
 import { useAuth } from '@/lib/useAuth';
-import { getOrders, createOrder, getLeaders, updateOrder, deleteOrder, getOrderPaymentSummary } from '@/lib/mock-api';
+import { api } from '@/lib/api-client';
 import { useAuthenticatedQuery } from '@/hooks/useAuthenticatedQuery';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -102,7 +102,7 @@ export default function Orders() {
     loading: ordersLoading,
     refetch: loadOrders
   } = useAuthenticatedQuery(
-    () => getOrders({}),
+    () => api.getOrders({}),
     {
       isReady: !authLoading && !!user,
       onError: () => toast.error('Failed to load orders')
@@ -113,7 +113,7 @@ export default function Orders() {
     data: leadersData,
     loading: leadersLoading
   } = useAuthenticatedQuery(
-    () => getLeaders({}),
+    () => api.getLeaders({}),
     {
       isReady: !authLoading && !!user,
       onError: () => toast.error('Failed to load leaders')
@@ -261,7 +261,7 @@ export default function Orders() {
     }
 
     try {
-      await createOrder(formData);
+      await api.createOrder(formData);
       toast.success('Order created successfully');
       setDialogOpen(false);
       setFormData({
@@ -425,7 +425,7 @@ export default function Orders() {
 
     setIsProcessing(true);
     try {
-      await updateOrder(editingOrder.id, editFormData);
+      await api.updateOrder(editingOrder.id, editFormData);
       toast.success('Order updated successfully');
       setEditDialogOpen(false);
       setEditingOrder(null);
@@ -443,7 +443,7 @@ export default function Orders() {
 
     // Fetch payment summary
     try {
-      const summary = await getOrderPaymentSummary(order.id);
+      const summary = await api.getOrderPaymentSummary(order.id);
       setDeletePaymentInfo(summary);
     } catch (error) {
       console.error('Failed to fetch payment summary:', error);
@@ -458,7 +458,7 @@ export default function Orders() {
 
     setIsProcessing(true);
     try {
-      await deleteOrder(deletingOrder.id);
+      await api.deleteOrder(deletingOrder.id);
       toast.success('Order deleted successfully');
       setDeleteDialogOpen(false);
       setDeletingOrder(null);

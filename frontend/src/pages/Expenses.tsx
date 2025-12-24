@@ -2,7 +2,7 @@ import { useState } from 'react';
 import { Plus, Receipt, Trash2, Edit } from 'lucide-react';
 import { useCurrency } from '@/hooks/useCurrency';
 import { useAuth } from '@/lib/useAuth';
-import { getExpenses, createExpense, updateExpense, deleteExpense } from '@/lib/mock-api';
+import { api } from '@/lib/api-client';
 import { useAuthenticatedQuery } from '@/hooks/useAuthenticatedQuery';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -73,7 +73,7 @@ export default function Expenses() {
     error,
     refetch: refetchExpenses
   } = useAuthenticatedQuery(
-    () => getExpenses({}),
+    () => api.getExpenses({}),
     {
       isReady: !authLoading && !!user,
       onError: (err) => toast.error(`Failed to load expenses: ${err.message}`)
@@ -141,10 +141,10 @@ export default function Expenses() {
 
     try {
       if (editingExpense) {
-        await updateExpense(editingExpense.id, formData);
+        await api.updateExpense(editingExpense.id, formData);
         toast.success('Expense updated successfully');
       } else {
-        await createExpense(formData);
+        await api.createExpense(formData);
         toast.success('Expense added successfully');
       }
 
@@ -186,7 +186,7 @@ export default function Expenses() {
     }
 
     try {
-      await deleteExpense(id);
+      await api.deleteExpense(id);
       toast.success('Expense deleted successfully');
       refetchExpenses();
     } catch (error: any) {

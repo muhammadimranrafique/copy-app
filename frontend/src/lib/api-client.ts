@@ -8,28 +8,25 @@ import type {
   Settings,
   SettingsUpdate,
   QueryParams,
-  ApiResponse,
-  ListResponse
+  ApiResponse
 } from './api-types';
 
 // Create a client with proper caching and retry logic
 export const queryClient = new QueryClient({
   defaultOptions: {
     queries: {
-      staleTime: 5 * 60 * 1000, // Consider data stale after 5 minutes
-      gcTime: 30 * 60 * 1000, // Keep unused data in cache for 30 minutes
+      staleTime: 5 * 60 * 1000,
+      gcTime: 30 * 60 * 1000,
       retry: (failureCount, error: any) => {
-        // Don't retry on 404s or auth errors
         if (error.status === 404 || error.status === 401 || error.status === 403) {
           return false;
         }
-        // Retry up to 3 times for other errors
         return failureCount < 3;
       },
       retryDelay: (attemptIndex) => Math.min(1000 * 2 ** attemptIndex, 30000),
     },
     mutations: {
-      retry: 2, // Retry failed mutations twice
+      retry: 2,
       retryDelay: (attemptIndex) => Math.min(1000 * 2 ** attemptIndex, 30000),
     },
   },
@@ -57,7 +54,6 @@ class ApiClient {
   private async handleResponse<T>(response: Response): Promise<T> {
     const isDebug = import.meta.env.VITE_DEBUG === 'true';
 
-    // Debug logging
     if (isDebug) {
       console.debug('[API Response]', {
         status: response.status,
@@ -66,7 +62,6 @@ class ApiClient {
       });
     }
 
-    // Handle auth errors
     if (response.status === 401) {
       localStorage.removeItem('access_token');
       localStorage.removeItem('current_user');
@@ -74,12 +69,10 @@ class ApiClient {
       throw new ApiError(401, 'Session expired. Please log in again.');
     }
 
-    // For 204 No Content
     if (response.status === 204) {
       return null as T;
     }
 
-    // Try to parse response
     let data: any;
     const text = await response.text();
 
@@ -96,7 +89,6 @@ class ApiClient {
       );
     }
 
-    // Handle error responses
     if (!response.ok) {
       throw new ApiError(
         response.status,
@@ -140,13 +132,16 @@ class ApiClient {
     }
   }
 
-  // Endpoint implementations with proper types
-  async getLeaders(params?: QueryParams): Promise<ListResponse<Leader>> {
+  // Leaders
+  async getLeaders(params?: QueryParams): Promise<any> {
     const qs = params ? `?${new URLSearchParams(params as any).toString()}` : '';
     const response = await this.fetchJson<Leader[]>(`/leaders/${qs}`);
+    // Normalization to match legacy expectations
+    const leaders = Array.isArray(response) ? response : [];
     return {
-      items: response,
-      total: response.length,
+      leaders,
+      items: leaders,
+      total: leaders.length,
     };
   }
 
@@ -155,32 +150,72 @@ class ApiClient {
       method: 'POST',
       body: JSON.stringify(data),
     });
-    return { success: true, data: response };
+    return { success: true, leader: response, data: response };
   }
 
-  async getOrders(params?: QueryParams): Promise<ListResponse<Order>> {
+  // Orders
+  async getOrders(params?: QueryParams): Promise<any> {
     const qs = params ? `?${new URLSearchParams(params as any).toString()}` : '';
     const response = await this.fetchJson<Order[]>(`/orders/${qs}`);
+
+    const orders = Array.isArray(response) ? response : [];
+    const normalizedOrders = orders.map((order: any) => {
+      const totalAmount = Number(order.totalAmount || order.total_amount || 0);
+      const paidAmount = Number(order.paidAmount || order.paid_amount || 0);
+      const balance = Number(order.balance ?? (totalAmount - paidAmount));
+
+      return {
+        ...order,
+        orderNumber: order.orderNumber || order.order_number || 'N/A',
+        totalAmount,
+        paidAmount,
+        balance,
+        orderDate: order.orderDate || order.order_date || new Date().toISOString()
+      };
+    });
+
     return {
-      items: response,
-      total: response.length,
+      orders: normalizedOrders,
+      items: normalizedOrders,
+      total: normalizedOrders.length,
     };
   }
 
-  async createOrder(data: Partial<Order>): Promise<ApiResponse<Order>> {
+  async createOrder(data: any): Promise<ApiResponse<Order>> {
     const response = await this.fetchJson<Order>('/orders/', {
       method: 'POST',
       body: JSON.stringify(data),
     });
-    return { success: true, data: response };
+    return { success: true, order: response, data: response };
   }
 
-  async getProducts(params?: QueryParams): Promise<ListResponse<Product>> {
+  async updateOrder(orderId: string, data: any): Promise<ApiResponse<Order>> {
+    const response = await this.fetchJson<Order>(`/orders/${orderId}`, {
+      method: 'PUT',
+      body: JSON.stringify(data),
+    });
+    return { success: true, order: response, data: response };
+  }
+
+  async deleteOrder(orderId: string): Promise<void> {
+    await this.fetchJson<void>(`/orders/${orderId}`, {
+      method: 'DELETE',
+    });
+  }
+
+  async getOrderPaymentSummary(orderId: string): Promise<any> {
+    return await this.fetchJson<any>(`/orders/${orderId}/payment-summary`);
+  }
+
+  // Products
+  async getProducts(params?: QueryParams): Promise<any> {
     const qs = params ? `?${new URLSearchParams(params as any).toString()}` : '';
     const response = await this.fetchJson<Product[]>(`/products/${qs}`);
+    const products = Array.isArray(response) ? response : [];
     return {
-      items: response,
-      total: response.length,
+      products,
+      items: products,
+      total: products.length,
     };
   }
 
@@ -189,68 +224,34 @@ class ApiClient {
       method: 'POST',
       body: JSON.stringify(data),
     });
-    return { success: true, data: response };
+    return { success: true, product: response, data: response };
   }
 
-  async getPayments(params?: QueryParams): Promise<ListResponse<Payment>> {
+  // Payments
+  async getPayments(params?: QueryParams): Promise<any> {
     const qs = params ? `?${new URLSearchParams(params as any).toString()}` : '';
     const response = await this.fetchJson<Payment[]>(`/payments/${qs}`);
+    const payments = Array.isArray(response) ? response : [];
+
+    const normalizedPayments = payments.map((payment: any) => ({
+      ...payment,
+      amount: Number(payment.amount || 0),
+      paymentDate: payment.paymentDate || payment.payment_date || new Date().toISOString()
+    }));
+
     return {
-      items: response,
-      total: response.length,
+      payments: normalizedPayments,
+      items: normalizedPayments,
+      total: normalizedPayments.length,
     };
   }
 
-  async createPayment(data: Partial<Payment>): Promise<ApiResponse<Payment>> {
+  async createPayment(data: any): Promise<ApiResponse<Payment>> {
     const response = await this.fetchJson<Payment>('/payments/', {
       method: 'POST',
       body: JSON.stringify(data),
     });
-    return { success: true, data: response };
-  }
-
-  async getLeaderLedger(leaderId: string): Promise<any> {
-    return await this.fetchJson<any>(`/leaders/${leaderId}/ledger`);
-  }
-
-  async getOrdersByLeader(leaderId: string): Promise<any[]> {
-    return await this.fetchJson<any[]>(`/orders/school/${leaderId}`);
-  }
-
-  async getDashboardData(params?: QueryParams): Promise<DashboardData> {
-    const qs = params ? `?${new URLSearchParams(params as any).toString()}` : '';
-    return await this.fetchJson<DashboardData>(`/dashboard/stats${qs}`);
-  }
-
-  // Settings endpoints
-  async getSettings(): Promise<Settings> {
-    return await this.fetchJson<Settings>('/settings/');
-  }
-
-  async updateSettings(data: SettingsUpdate): Promise<Settings> {
-    return await this.fetchJson<Settings>('/settings/', {
-      method: 'PUT',
-      body: JSON.stringify(data),
-    });
-  }
-  async downloadPaymentReceipt(paymentId: string): Promise<void> {
-    const token = localStorage.getItem('access_token');
-    const response = await fetch(`${API_BASE}/payments/${paymentId}/receipt`, {
-      method: 'POST',
-      headers: {
-        'Authorization': `Bearer ${token}`,
-      },
-    });
-    if (!response.ok) throw new Error('Failed to download receipt');
-    const blob = await response.blob();
-    const url = window.URL.createObjectURL(blob);
-    const a = document.createElement('a');
-    a.href = url;
-    a.download = `receipt-${paymentId}.pdf`;
-    document.body.appendChild(a);
-    a.click();
-    window.URL.revokeObjectURL(url);
-    document.body.removeChild(a);
+    return { success: true, payment: response, data: response };
   }
 
   async updatePayment(paymentId: string, data: any): Promise<any> {
@@ -265,7 +266,81 @@ class ApiClient {
       method: 'DELETE',
     });
   }
+
+  async downloadPaymentReceipt(paymentId: string): Promise<void> {
+    const token = localStorage.getItem('access_token');
+    const response = await fetch(`${API_BASE}/payments/${paymentId}/receipt`, {
+      method: 'POST',
+      headers: {
+        'Authorization': `Bearer ${token}`,
+      },
+    });
+    if (!response.ok) throw new Error('Failed to download receipt');
+    const blob = await response.blob();
+    const url = window.URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    const filename = `receipt-${paymentId}.pdf`;
+    a.download = filename;
+    document.body.appendChild(a);
+    a.click();
+    window.URL.revokeObjectURL(url);
+    document.body.removeChild(a);
+  }
+
+  // Expenses
+  async getExpenses(params?: QueryParams): Promise<any> {
+    const qs = params ? `?${new URLSearchParams(params as any).toString()}` : '';
+    const response = await this.fetchJson<any[]>(`/expenses/${qs}`);
+    const expenses = Array.isArray(response) ? response : [];
+    return {
+      expenses,
+      items: expenses,
+      total: expenses.length
+    };
+  }
+
+  async createExpense(data: any): Promise<any> {
+    return this.fetchJson<any>('/expenses/', {
+      method: 'POST',
+      body: JSON.stringify(data),
+    });
+  }
+
+  async updateExpense(id: string, data: any): Promise<any> {
+    return this.fetchJson<any>(`/expenses/${id}`, {
+      method: 'PUT',
+      body: JSON.stringify(data),
+    });
+  }
+
+  async deleteExpense(id: string): Promise<void> {
+    await this.fetchJson<void>(`/expenses/${id}`, {
+      method: 'DELETE',
+    });
+  }
+
+  // Business logic
+  async getLeaderLedger(leaderId: string): Promise<any> {
+    return await this.fetchJson<any>(`/leaders/${leaderId}/ledger`);
+  }
+
+  async getDashboardData(params?: QueryParams): Promise<DashboardData> {
+    const qs = params ? `?${new URLSearchParams(params as any).toString()}` : '';
+    return await this.fetchJson<DashboardData>(`/dashboard/stats${qs}`);
+  }
+
+  // Settings
+  async getSettings(): Promise<Settings> {
+    return await this.fetchJson<Settings>('/settings/');
+  }
+
+  async updateSettings(data: SettingsUpdate): Promise<Settings> {
+    return await this.fetchJson<Settings>('/settings/', {
+      method: 'PUT',
+      body: JSON.stringify(data),
+    });
+  }
 }
 
-// Export a singleton instance
 export const api = new ApiClient();

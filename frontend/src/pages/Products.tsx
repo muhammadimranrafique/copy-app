@@ -2,8 +2,7 @@ import { useState } from 'react';
 import { useAuthenticatedQuery } from '@/hooks/useAuthenticatedQuery';
 import { Plus, Package } from 'lucide-react';
 import { useCurrency } from '@/hooks/useCurrency';
-import { useAuth } from '@/lib/useAuth';
-import { getProducts, createProduct } from '@/lib/mock-api';
+import { api } from '@/lib/api-client';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
@@ -40,7 +39,7 @@ export default function Products() {
     loading,
     refetch: loadProducts
   } = useAuthenticatedQuery(
-    () => getProducts({}),
+    () => api.getProducts({}),
     {
       isReady: !authLoading && !!user,
       onError: (err) => toast.error(`Failed to load products: ${err.message}`),
@@ -65,7 +64,7 @@ export default function Products() {
     }
 
     try {
-      await createProduct(formData);
+      await api.createProduct(formData);
       toast.success('Product created successfully');
       setDialogOpen(false);
       setFormData({ productName: '', category: '', costPrice: 0, salePrice: 0, stockQuantity: 0, unit: 'pcs' });
