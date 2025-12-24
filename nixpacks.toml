@@ -1,8 +1,8 @@
 [phases.setup]
-nixPkgs = ["python312", "gcc", "postgresql"]
+nixPkgs = ["python312", "python312Packages.pip", "gcc", "postgresql"]
 
 [phases.install]
-cmds = ["pip install -r backend/requirements.txt"]
+cmds = ["python3 -m venv /opt/venv", "/opt/venv/bin/pip install -r backend/requirements.txt"]
 
 [start]
-cmd = "cd backend && uvicorn main:app --host 0.0.0.0 --port $PORT"
+cmd = "PATH=\"/opt/venv/bin:$PATH\" cd backend && uvicorn main:app --host 0.0.0.0 --port $PORT"
