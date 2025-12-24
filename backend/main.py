@@ -24,7 +24,6 @@ app = FastAPI(
     lifespan=lifespan,
     docs_url="/docs",  # Keep docs at root for easier access
     openapi_url="/openapi.json",  # Keep OpenAPI spec at root
-    redirect_slashes=False  # Disable to prevent 307 redirects
 )
 
 # CORS Middleware
@@ -83,7 +82,7 @@ def custom_openapi():
 app.openapi = custom_openapi
 
 # Import and register routers
-from routers import auth, schools, products, orders, payments, expenses, dashboard, leaders, settings
+from routers import auth, schools, products, orders, payments, expenses, dashboard, leaders, settings as settings_router
 
 app.include_router(auth.router, prefix="/api/v1")
 app.include_router(schools.router, prefix="/api/v1")
@@ -93,7 +92,7 @@ app.include_router(orders.router, prefix="/api/v1")
 app.include_router(payments.router, prefix="/api/v1")
 app.include_router(expenses.router, prefix="/api/v1")
 app.include_router(dashboard.router, prefix="/api/v1")
-app.include_router(settings.router, prefix="/api/v1")
+app.include_router(settings_router.router, prefix="/api/v1")
 
 if __name__ == "__main__":
     import uvicorn
