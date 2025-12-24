@@ -61,7 +61,7 @@ export function PaymentHistory({ orderId, orderTotal, currentBalance, onDownload
             console.log(`[PaymentHistory] Fetching payments for order: ${orderId}`);
 
             const response = await fetch(
-                `${import.meta.env.VITE_API_BASE_URL || 'http://127.0.0.1:8000/api/v1'}/payments/?orderId=${orderId}`,
+                `${import.meta.env.VITE_API_BASE_URL || 'http://127.0.0.1:8080/api/v1'}/payments/?orderId=${orderId}`,
                 {
                     headers: {
                         'Authorization': `Bearer ${token}`,
@@ -106,7 +106,7 @@ export function PaymentHistory({ orderId, orderTotal, currentBalance, onDownload
                 toast.loading('Generating receipt...', { id: 'download-receipt' });
                 const token = localStorage.getItem('access_token');
                 const response = await fetch(
-                    `${import.meta.env.VITE_API_BASE_URL || 'http://127.0.0.1:8000/api/v1'}/payments/${paymentId}/receipt`,
+                    `${import.meta.env.VITE_API_BASE_URL || 'http://127.0.0.1:8080/api/v1'}/payments/${paymentId}/receipt`,
                     {
                         method: 'POST',
                         headers: {
@@ -508,12 +508,12 @@ export function PaymentHistory({ orderId, orderTotal, currentBalance, onDownload
                             {/* Preview of changes */}
                             {editFormData.amount !== editingPayment.amount && (
                                 <div className={`rounded-lg p-3 border ${(payments.reduce((sum, p) => sum + p.amount, 0) - editingPayment.amount + editFormData.amount) > orderTotal
-                                        ? 'bg-red-50 border-red-200'
-                                        : 'bg-green-50 border-green-200'
+                                    ? 'bg-red-50 border-red-200'
+                                    : 'bg-green-50 border-green-200'
                                     }`}>
                                     <p className={`text-xs font-medium mb-1 ${(payments.reduce((sum, p) => sum + p.amount, 0) - editingPayment.amount + editFormData.amount) > orderTotal
-                                            ? 'text-red-700'
-                                            : 'text-green-700'
+                                        ? 'text-red-700'
+                                        : 'text-green-700'
                                         }`}>
                                         {(payments.reduce((sum, p) => sum + p.amount, 0) - editingPayment.amount + editFormData.amount) > orderTotal
                                             ? '⚠️ Warning: Would cause overpayment'
@@ -521,8 +521,8 @@ export function PaymentHistory({ orderId, orderTotal, currentBalance, onDownload
                                         }
                                     </p>
                                     <p className={`text-sm font-semibold ${(payments.reduce((sum, p) => sum + p.amount, 0) - editingPayment.amount + editFormData.amount) > orderTotal
-                                            ? 'text-red-900'
-                                            : 'text-green-900'
+                                        ? 'text-red-900'
+                                        : 'text-green-900'
                                         }`}>
                                         Rs {(orderTotal - (payments.reduce((sum, p) => sum + p.amount, 0) - editingPayment.amount + editFormData.amount)).toLocaleString()}
                                     </p>
