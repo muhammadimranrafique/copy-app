@@ -306,7 +306,7 @@ export default function Orders() {
       toast.loading('Generating invoice...', { id: 'download-invoice' });
       const token = localStorage.getItem('access_token');
       const response = await fetch(
-        `${import.meta.env.VITE_API_BASE_URL || 'http://127.0.0.1:8000/api/v1'}/orders/${orderId}/invoice`,
+        `${import.meta.env.VITE_API_BASE_URL || 'http://127.0.0.1:8080/api/v1'}/orders/${orderId}/invoice`,
         {
           method: 'POST',
           headers: {
