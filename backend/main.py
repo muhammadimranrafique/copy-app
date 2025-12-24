@@ -57,8 +57,11 @@ def custom_openapi():
         routes=app.routes,
     )
     
+    # Initialize components if they don't exist
+    components = openapi_schema.setdefault("components", {})
+    
     # Add security scheme for Bearer token
-    openapi_schema["components"]["securitySchemes"] = {
+    components["securitySchemes"] = {
         "BearerAuth": {
             "type": "http",
             "scheme": "bearer",
