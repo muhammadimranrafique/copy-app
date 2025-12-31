@@ -25,7 +25,6 @@ async function fetchJSON(path: string, opts: RequestInit = {}) {
   // Debug logging: Log the request
   const isDebug = import.meta.env.VITE_DEBUG === 'true';
   if (isDebug) {
-    // eslint-disable-next-line no-console
     console.debug('[API Request]', opts.method || 'GET', url, opts.body ? JSON.parse(opts.body as string) : '');
   }
 
@@ -33,7 +32,6 @@ async function fetchJSON(path: string, opts: RequestInit = {}) {
 
   // Debug logging: Log the response status
   if (isDebug) {
-    // eslint-disable-next-line no-console
     console.debug('[API Response]', res.status, res.statusText, url);
   }
 
@@ -48,7 +46,6 @@ async function fetchJSON(path: string, opts: RequestInit = {}) {
   if (!res.ok) {
     const body = await res.text().catch(() => '');
     if (isDebug) {
-      // eslint-disable-next-line no-console
       console.debug('[API Error Body]', url, body);
     }
     throw new Error(`${res.status} ${res.statusText}: ${body}`);
@@ -57,7 +54,6 @@ async function fetchJSON(path: string, opts: RequestInit = {}) {
   // Handle 204 No Content
   if (res.status === 204) {
     if (isDebug) {
-      // eslint-disable-next-line no-console
       console.debug('[API Response Body]', url, '=> (204 No Content)');
     }
     return null;
@@ -68,7 +64,6 @@ async function fetchJSON(path: string, opts: RequestInit = {}) {
     const text = await res.text();
 
     if (isDebug) {
-      // eslint-disable-next-line no-console
       console.debug('[API Response Text]', url, '=>', text.substring(0, 500) + (text.length > 500 ? '...' : ''));
     }
 
@@ -78,13 +73,11 @@ async function fetchJSON(path: string, opts: RequestInit = {}) {
       try {
         const parsed = JSON.parse(text);
         if (isDebug) {
-          // eslint-disable-next-line no-console
           console.debug('[API Response JSON]', url, '=>', parsed);
         }
         return parsed;
       } catch (parseError) {
         if (isDebug) {
-          // eslint-disable-next-line no-console
           console.error('[API JSON Parse Error]', url, parseError, 'Raw text:', text);
         }
         throw new Error(`Failed to parse JSON response: ${parseError}`);
@@ -92,14 +85,12 @@ async function fetchJSON(path: string, opts: RequestInit = {}) {
     } else {
       // Not JSON, return as text
       if (isDebug) {
-        // eslint-disable-next-line no-console
         console.debug('[API Response (non-JSON)]', url, '=>', text);
       }
       return text;
     }
   } catch (e) {
     if (isDebug) {
-      // eslint-disable-next-line no-console
       console.error('[API Fetch Error]', url, e);
     }
     throw e;

@@ -76,7 +76,7 @@ export default function Expenses() {
     () => api.getExpenses({}),
     {
       isReady: !authLoading && !!user,
-      onError: (err) => toast.error(`Failed to load expenses: ${err.message}`)
+      onError: (_err) => toast.error(`Failed to load expenses: ${_err.message}`)
     }
   );
 

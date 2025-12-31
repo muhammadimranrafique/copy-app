@@ -1,5 +1,6 @@
 import { useState } from 'react';
 import { useAuthenticatedQuery } from '@/hooks/useAuthenticatedQuery';
+import { useAuth } from '@/lib/useAuth';
 import { Plus, Package } from 'lucide-react';
 import { useCurrency } from '@/hooks/useCurrency';
 import { api } from '@/lib/api-client';

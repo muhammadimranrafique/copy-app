@@ -69,7 +69,7 @@ export default function Leaders() {
       setDialogOpen(false);
       setFormData({ name: '', type: 'School', contact: '', address: '', opening_balance: 0 });
       loadLeaders();
-    } catch (error) {
+    } catch (_error) {
       toast.error('Failed to create leader');
     }
   };
@@ -79,7 +79,7 @@ export default function Leaders() {
     setExportingId(leader.id);
     try {
       await exportLeaderPayments(leader.id, leader.name);
-    } catch (error) {
+    } catch (_error) {
       // Error already handled in exportLeaderPayments
     } finally {
       setExportingId(null);

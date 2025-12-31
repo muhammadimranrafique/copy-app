@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useCallback } from 'react';
 import { Download, Calendar, CreditCard, Receipt, TrendingDown, Pencil, Trash2 } from 'lucide-react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
@@ -49,11 +49,7 @@ export function PaymentHistory({ orderId, orderTotal, currentBalance, onDownload
     const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
     const [deleteLoading, setDeleteLoading] = useState(false);
 
-    useEffect(() => {
-        fetchPaymentHistory();
-    }, [orderId]);
-
-    const fetchPaymentHistory = async () => {
+    const fetchPaymentHistory = useCallback(async () => {
         try {
             setLoading(true);
             const token = localStorage.getItem('access_token');
@@ -96,7 +92,11 @@ export function PaymentHistory({ orderId, orderTotal, currentBalance, onDownload
             // Always set loading to false to prevent infinite loading state
             setLoading(false);
         }
-    };
+    }, [orderId]);
+
+    useEffect(() => {
+        fetchPaymentHistory();
+    }, [fetchPaymentHistory]);
 
     const handleDownloadReceipt = async (paymentId: string) => {
         if (onDownloadReceipt) {

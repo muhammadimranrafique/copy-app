@@ -343,7 +343,7 @@ export default function Orders() {
     setEditingOrder(order);
 
     // Prepare items - use existing items or create one from legacy fields
-    let items = order.items && order.items.length > 0 ? order.items.map(item => ({
+    const items = order.items && order.items.length > 0 ? order.items.map(item => ({
       itemDescription: item.itemDescription,
       quantity: item.quantity,
       pages: item.pages || 0,
