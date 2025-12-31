@@ -26,7 +26,9 @@ class Settings(BaseSettings):
         "http://localhost:5174",
         "http://127.0.0.1:5173",
         "http://127.0.0.1:5174",
-        "http://localhost:3000"
+        "http://localhost:3000",
+        "https://copy-app.vercel.app",
+        "https://copy-app-production.up.railway.app"
     ]
 
     model_config = SettingsConfigDict(env_file=".env", case_sensitive=False, extra='ignore')

@@ -80,28 +80,68 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       form.append('username', options?.email || '');
       form.append('password', options?.password || '');
 
-      const res = await fetch(`${API_BASE}/auth/login`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
-        body: form.toString(),
-      });
+      let res: Response;
+      try {
+        res = await fetch(`${API_BASE}/auth/login`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+          body: form.toString(),
+        });
+      } catch (networkError) {
+        // This catches CORS errors and network failures
+        console.error('Network error during login:', networkError);
+        throw new Error(
+          'Unable to connect to the server. This may be a network issue or the server may be temporarily unavailable. Please try again later.'
+        );
+      }
 
       if (!res.ok) {
-        const text = await res.text();
-        throw new Error(text || 'Login failed');
+        let errorMessage = 'Login failed';
+        try {
+          const errorData = await res.json();
+          errorMessage = errorData.detail || errorData.message || errorMessage;
+        } catch {
+          const text = await res.text();
+          errorMessage = text || errorMessage;
+        }
+
+        if (res.status === 401) {
+          throw new Error('Invalid email or password. Please check your credentials and try again.');
+        } else if (res.status === 403) {
+          throw new Error('Your account has been disabled. Please contact support.');
+        } else if (res.status >= 500) {
+          throw new Error('Server error. Please try again later.');
+        }
+        throw new Error(errorMessage);
       }
 
       const data = await res.json();
       if (data?.access_token) {
         localStorage.setItem('access_token', data.access_token);
         // Some backends return user in response; otherwise call /auth/me
-        const me = data.user ?? (await (await fetch(`${API_BASE}/auth/me`, { headers: { Authorization: `Bearer ${data.access_token}` } })).json());
-        setUser(me);
-        try {
-          localStorage.setItem('current_user', JSON.stringify(me));
-        } catch (e) {
-          console.warn('Failed to persist current_user', e);
+        let me = data.user;
+        if (!me) {
+          try {
+            const meRes = await fetch(`${API_BASE}/auth/me`, {
+              headers: { Authorization: `Bearer ${data.access_token}` }
+            });
+            if (meRes.ok) {
+              me = await meRes.json();
+            }
+          } catch (e) {
+            console.warn('Failed to fetch user profile:', e);
+          }
         }
+        if (me) {
+          setUser(me);
+          try {
+            localStorage.setItem('current_user', JSON.stringify(me));
+          } catch (e) {
+            console.warn('Failed to persist current_user', e);
+          }
+        }
+      } else {
+        throw new Error('Login successful but no access token received.');
       }
     } finally {
       setIsLoading(false);
