@@ -59,9 +59,14 @@ class ApiClient {
         status: response.status,
         statusText: response.statusText,
         url: response.url,
+        headers: {
+          'content-type': response.headers.get('content-type'),
+          'access-control-allow-origin': response.headers.get('access-control-allow-origin'),
+        }
       });
     }
 
+    // Handle 401 Unauthorized
     if (response.status === 401) {
       localStorage.removeItem('access_token');
       localStorage.removeItem('current_user');
@@ -69,10 +74,16 @@ class ApiClient {
       throw new ApiError(401, 'Session expired. Please log in again.');
     }
 
+    // Handle 204 No Content (successful DELETE operations)
     if (response.status === 204) {
+      console.log('[API Success] 204 No Content - Operation completed successfully', {
+        url: response.url,
+        method: 'DELETE'
+      });
       return null as T;
     }
 
+    // Handle responses with body
     let data: any;
     const text = await response.text();
 
@@ -82,7 +93,22 @@ class ApiClient {
         console.debug('[API Response Data]', data);
       }
     } catch (error) {
-      console.error('[API Parse Error]', error);
+      console.error('[API Parse Error]', {
+        error,
+        responseText: text,
+        status: response.status,
+        url: response.url
+      });
+
+      // If response is not OK and we can't parse it, throw error
+      if (!response.ok) {
+        throw new ApiError(
+          response.status,
+          `Server error: ${response.statusText}`,
+          { responseText: text }
+        );
+      }
+
       throw new ApiError(
         response.status,
         'Invalid JSON response from server'
@@ -90,9 +116,17 @@ class ApiClient {
     }
 
     if (!response.ok) {
+      const errorMessage = data?.detail || data?.message || response.statusText;
+      console.error('[API Error]', {
+        status: response.status,
+        message: errorMessage,
+        url: response.url,
+        data
+      });
+
       throw new ApiError(
         response.status,
-        data?.message || response.statusText,
+        errorMessage,
         data
       );
     }
@@ -262,9 +296,32 @@ class ApiClient {
   }
 
   async deletePayment(paymentId: string): Promise<void> {
-    await this.fetchJson<void>(`/payments/${paymentId}`, {
-      method: 'DELETE',
-    });
+    console.log('[API] Deleting payment:', paymentId);
+
+    try {
+      await this.fetchJson<void>(`/payments/${paymentId}`, {
+        method: 'DELETE',
+      });
+
+      console.log('[API] Payment deleted successfully:', paymentId);
+    } catch (error: any) {
+      console.error('[API] Failed to delete payment:', {
+        paymentId,
+        error: error.message,
+        status: error.status,
+        data: error.data
+      });
+
+      // Re-throw with enhanced error message
+      if (error instanceof ApiError) {
+        throw new ApiError(
+          error.status,
+          `Failed to delete payment: ${error.message}`,
+          error.data
+        );
+      }
+      throw error;
+    }
   }
 
   async downloadPaymentReceipt(paymentId: string): Promise<void> {

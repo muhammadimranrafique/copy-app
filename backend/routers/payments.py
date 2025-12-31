@@ -565,6 +565,9 @@ def delete_payment(
         session.commit()
         
         print(f"[Delete Payment] ✓ Payment deleted successfully")
+        print(f"[Delete Payment] Summary: Deleted payment {payment_id} (amount: {payment.amount})")
+        if order:
+            print(f"[Delete Payment] Order {order.order_number} updated: paid={order.paid_amount}, balance={order.balance}, status={order.status.value}")
         
         return None
         
