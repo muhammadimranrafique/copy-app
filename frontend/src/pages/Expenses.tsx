@@ -13,10 +13,23 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { toast } from 'sonner';
 import { Toaster } from 'sonner';
 import { Badge } from '@/components/ui/badge';
-import { format } from 'date-fns';
+import { format, isValid, parseISO } from 'date-fns';
 import { Textarea } from '@/components/ui/textarea';
 import { LoadingSpinner } from '@/components/LoadingSpinner';
 import type { Expense, ExpenseCategory, ExpenseCreate } from '@/lib/api-types';
+
+// Safe date formatting helper
+const formatDate = (dateString: string | null | undefined, formatStr: string = 'MMM dd, yyyy'): string => {
+  if (!dateString) return 'N/A';
+  try {
+    // Handle ISO date strings and simple date strings
+    const date = dateString.includes('T') ? parseISO(dateString) : new Date(dateString);
+    if (!isValid(date)) return 'Invalid Date';
+    return format(date, formatStr);
+  } catch {
+    return 'Invalid Date';
+  }
+};
 
 const EXPENSE_CATEGORIES: ExpenseCategory[] = [
   'MATERIAL',
@@ -452,7 +465,7 @@ export default function Expenses() {
                   <h3 className="font-semibold text-base sm:text-lg mb-1 break-words">{expense.description}</h3>
 
                   <div className="flex flex-wrap items-center gap-2 sm:gap-4 text-xs sm:text-sm text-gray-600">
-                    <span>Date: {format(new Date(expense.expenseDate), 'MMM dd, yyyy')}</span>
+                    <span>Date: {formatDate(expense.expenseDate)}</span>
                     {expense.referenceNumber && (
                       <span className="truncate">Ref: {expense.referenceNumber}</span>
                     )}
