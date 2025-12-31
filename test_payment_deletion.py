@@ -18,7 +18,7 @@ from datetime import datetime
 
 # Configuration
 BASE_URL = "http://localhost:8080/api/v1"
-ADMIN_USERNAME = "admin"  # Update with your admin username
+ADMIN_USERNAME = "admin@schoolcopy.com"  # Admin email
 ADMIN_PASSWORD = "admin123"  # Update with your admin password
 
 def print_section(title):
