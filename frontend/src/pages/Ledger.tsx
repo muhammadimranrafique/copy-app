@@ -29,6 +29,14 @@ interface Payment {
     reference_number: string;
 }
 
+interface Leader {
+    id: string;
+    name: string;
+    type: string;
+    contact?: string;
+    address?: string;
+}
+
 interface LedgerData {
     client: {
         id: string;
@@ -114,7 +122,7 @@ export default function Ledger() {
                             {leadersLoading ? (
                                 <div className="p-2 text-center text-muted-foreground">Loading...</div>
                             ) : (
-                                leaders.map((leader: any) => (
+                                leaders.map((leader: Leader) => (
                                     <SelectItem key={leader.id} value={leader.id}>
                                         {leader.name} ({leader.type})
                                     </SelectItem>
