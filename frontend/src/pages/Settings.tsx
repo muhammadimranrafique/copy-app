@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useCallback } from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Label } from '@/components/ui/label';
 import { Input } from '@/components/ui/input';
@@ -26,11 +26,7 @@ export default function Settings() {
   const [isSaving, setIsSaving] = useState(false);
   const [isLoading, setIsLoading] = useState(true);
 
-  useEffect(() => {
-    loadSettings();
-  }, []);
-
-  const loadSettings = async () => {
+  const loadSettings = useCallback(async () => {
     try {
       setIsLoading(true);
       const data = await api.getSettings();
@@ -42,7 +38,11 @@ export default function Settings() {
     } finally {
       setIsLoading(false);
     }
-  };
+  }, [updateCurrency]);
+
+  useEffect(() => {
+    loadSettings();
+  }, [loadSettings]);
 
   const handleChange = (field: keyof Settings, value: string) => {
     setSettings(prev => ({ ...prev, [field]: value }));
@@ -154,8 +154,8 @@ export default function Settings() {
             <CardContent className="space-y-3 sm:space-y-4">
               <div>
                 <Label htmlFor="currency_code">Currency</Label>
-                <Select 
-                  value={settings.currency_code} 
+                <Select
+                  value={settings.currency_code}
                   onValueChange={(value) => {
                     handleChange('currency_code', value);
                     const symbols: Record<string, string> = {
@@ -192,8 +192,8 @@ export default function Settings() {
               </div>
               <div>
                 <Label htmlFor="timezone">Timezone</Label>
-                <Select 
-                  value={settings.timezone} 
+                <Select
+                  value={settings.timezone}
                   onValueChange={(value) => handleChange('timezone', value)}
                 >
                   <SelectTrigger className="mt-2">
@@ -210,8 +210,8 @@ export default function Settings() {
               </div>
               <div>
                 <Label htmlFor="date_format">Date Format</Label>
-                <Select 
-                  value={settings.date_format} 
+                <Select
+                  value={settings.date_format}
                   onValueChange={(value) => handleChange('date_format', value)}
                 >
                   <SelectTrigger className="mt-2">
@@ -231,8 +231,8 @@ export default function Settings() {
 
       {/* Save Button */}
       <div className="flex justify-end">
-        <Button 
-          onClick={handleSave} 
+        <Button
+          onClick={handleSave}
           disabled={isSaving || isLoading}
           className="min-w-32"
         >

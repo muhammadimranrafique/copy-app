@@ -50,7 +50,7 @@ export default function Payments() {
       const fetchOrders = async () => {
         try {
           setLoadingOrders(true);
-          // @ts-ignore
+          // @ts-expect-error - getOrdersByLeader is a legacy method
           const orders = await api.getOrdersByLeader(formData.leaderId);
 
           // Ensure all orders have required fields with default values
