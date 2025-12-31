@@ -37,6 +37,16 @@ class Settings(BaseSettings):
     def assemble_cors_origins(self) -> 'Settings':
         if isinstance(self.allowed_origins, str):
             self.allowed_origins = [i.strip() for i in self.allowed_origins.split(",")]
+
+        # Always ensure production URLs are included
+        production_origins = [
+            "https://copy-app.vercel.app",
+            "https://copy-app-production.up.railway.app"
+        ]
+        for origin in production_origins:
+            if origin not in self.allowed_origins:
+                self.allowed_origins.append(origin)
+
         return self
     
     # Company Info
