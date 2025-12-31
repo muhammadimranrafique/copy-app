@@ -44,14 +44,6 @@ async def root():
 async def health_check():
     return {"status": "healthy"}
 
-@app.get("/debug/cors")
-async def debug_cors():
-    """Debug endpoint to check CORS configuration (remove in production)"""
-    return {
-        "allowed_origins": settings.allowed_origins,
-        "type": str(type(settings.allowed_origins).__name__)
-    }
-
 # Configure OpenAPI security scheme for Swagger UI
 def custom_openapi():
     if app.openapi_schema:
