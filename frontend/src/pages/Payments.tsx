@@ -232,18 +232,59 @@ export default function Payments() {
   const handleDeleteConfirm = async () => {
     if (!deletingPayment) return;
 
+    console.log('[Payment Delete] Starting deletion process for payment:', {
+      id: deletingPayment.id,
+      amount: deletingPayment.amount,
+      client: deletingPayment.client?.name
+    });
+
     try {
       setDeleteLoading(true);
+
+      console.log('[Payment Delete] Calling API to delete payment...');
       await api.deletePayment(deletingPayment.id);
-      toast.success('Payment deleted successfully');
+
+      console.log('[Payment Delete] API call successful, payment deleted from backend');
+
+      // Close dialog and reset state BEFORE showing success message
       setDeleteDialogOpen(false);
       setDeletingPayment(null);
 
-      // Refresh payments list
+      // Show success message
+      toast.success('Payment deleted successfully', {
+        description: `Payment of ${formatAmount(deletingPayment.amount)} has been removed`
+      });
+
+      console.log('[Payment Delete] Refreshing payments list...');
+
+      // Refresh payments list to update UI
       await refetchPayments();
+
+      console.log('[Payment Delete] ✓ Delete operation completed successfully');
     } catch (error: any) {
-      console.error('Error deleting payment:', error);
-      toast.error(error?.message || 'Failed to delete payment');
+      console.error('[Payment Delete] Error during deletion:', {
+        error: error.message,
+        status: error.status,
+        data: error.data,
+        paymentId: deletingPayment.id
+      });
+
+      // Determine user-friendly error message
+      let errorMessage = 'Failed to delete payment';
+
+      if (error.status === 403) {
+        errorMessage = 'You do not have permission to delete payments';
+      } else if (error.status === 404) {
+        errorMessage = 'Payment not found. It may have already been deleted';
+      } else if (error.status === 0) {
+        errorMessage = 'Network error. Please check your connection and try again';
+      } else if (error.message) {
+        errorMessage = error.message;
+      }
+
+      toast.error(errorMessage, {
+        description: 'Please try again or contact support if the problem persists'
+      });
     } finally {
       setDeleteLoading(false);
     }
