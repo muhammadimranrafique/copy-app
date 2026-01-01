@@ -187,6 +187,27 @@ class ApiClient {
     return { success: true, leader: response, data: response };
   }
 
+  async getOrdersByLeader(leaderId: string): Promise<Order[]> {
+    const response = await this.fetchJson<Order[]>(`/leaders/${leaderId}/orders`);
+    const orders = Array.isArray(response) ? response : [];
+
+    // Normalize orders to match frontend expectations
+    return orders.map((order: any) => {
+      const totalAmount = Number(order.totalAmount || order.total_amount || 0);
+      const paidAmount = Number(order.paidAmount || order.paid_amount || 0);
+      const balance = Number(order.balance ?? (totalAmount - paidAmount));
+
+      return {
+        ...order,
+        orderNumber: order.orderNumber || order.order_number || 'N/A',
+        totalAmount,
+        paidAmount,
+        balance,
+        orderDate: order.orderDate || order.order_date || new Date().toISOString()
+      };
+    });
+  }
+
   // Orders
   async getOrders(params?: QueryParams): Promise<any> {
     const qs = params ? `?${new URLSearchParams(params as any).toString()}` : '';
