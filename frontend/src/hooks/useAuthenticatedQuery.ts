@@ -13,9 +13,13 @@ export function useAuthenticatedQuery<T>(
     retryCount?: number;
     retryDelay?: (attemptIndex: number) => number;
     enabled?: boolean;
+    queryKey?: (string | number | boolean | null | undefined)[];
   }
 ) {
-  const queryKey = [queryFn.toString()]; // Simple key based on function
+  // Use provided queryKey or fall back to function string representation
+  // Note: When using dynamic parameters (like IDs), always provide a queryKey
+  // that includes those parameters to ensure proper cache invalidation
+  const queryKey = options?.queryKey ?? [queryFn.toString()];
 
   const { data, isLoading, error, refetch } = useQuery({
     queryKey,
