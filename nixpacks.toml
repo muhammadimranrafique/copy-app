@@ -1,0 +1,12 @@
+# Nixpacks configuration for Railway deployment
+# This tells Railway how to build and run the Python backend in a monorepo structure
+
+[phases.setup]
+nixPkgs = ["python311", "gcc", "postgresql"]
+
+[phases.install]
+cmds = ["cd backend && pip install -r requirements.txt"]
+
+[start]
+cmd = "cd backend && uvicorn main:app --host 0.0.0.0 --port ${PORT:-8080}"
+
