@@ -60,7 +60,8 @@ export function ClientLedgerModal({ clientId, clientName, open, onOpenChange }: 
         () => api.getLeaderLedger(clientId),
         {
             isReady: open && !!clientId,
-            onError: () => toast.error('Failed to load ledger data')
+            onError: () => toast.error('Failed to load ledger data'),
+            queryKey: ['clientLedger', clientId]
         }
     );
 

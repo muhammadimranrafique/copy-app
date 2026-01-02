@@ -78,7 +78,8 @@ export default function Ledger() {
         () => api.getLeaderLedger(selectedLeaderId),
         {
             isReady: !!selectedLeaderId,
-            onError: () => toast.error('Failed to load ledger data')
+            onError: () => toast.error('Failed to load ledger data'),
+            queryKey: ['leaderLedger', selectedLeaderId]
         }
     );
 
