@@ -1,0 +1,18 @@
+# Ignore frontend and Node.js related files for backend deployment
+frontend/
+node_modules/
+package.json
+package-lock.json
+
+# Ignore test and documentation files
+*.md
+test_*.py
+debug*.py
+*.html
+
+# Ignore local development files
+.venv/
+__pycache__/
+*.pyc
+.env.local
+
