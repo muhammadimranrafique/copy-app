@@ -34,6 +34,10 @@ export const queryClient = new QueryClient({
 
 const API_BASE = import.meta.env.VITE_API_BASE_URL || 'http://127.0.0.1:8080/api/v1';
 
+if (import.meta.env.PROD) {
+  console.log('[API] Using base URL:', API_BASE);
+}
+
 class ApiError extends Error {
   constructor(
     public status: number,
