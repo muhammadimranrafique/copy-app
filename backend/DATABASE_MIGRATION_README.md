@@ -35,10 +35,10 @@ python test_db_connection.py
 **Expected Output:**
 ```
 2024-01-XX XX:XX:XX - INFO - === Database Connection Test ===
-2024-01-XX XX:XX:XX - INFO - Host: redacted-host
+2024-01-XX XX:XX:XX - INFO - Host: <your-neon-host>.neon.tech
 2024-01-XX XX:XX:XX - INFO - Port: 5432
-2024-01-XX XX:XX:XX - INFO - Database: neondb
-2024-01-XX XX:XX:XX - INFO - Username: redacted-role
+2024-01-XX XX:XX:XX - INFO - Database: <your-database>
+2024-01-XX XX:XX:XX - INFO - Username: <your-username>
 2024-01-XX XX:XX:XX - INFO - SSL Mode: require
 2024-01-XX XX:XX:XX - INFO - ✓ psycopg2 connection successful
 2024-01-XX XX:XX:XX - INFO - ✅ All database connections successful!
