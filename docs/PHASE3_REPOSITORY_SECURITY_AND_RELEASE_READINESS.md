@@ -202,3 +202,84 @@ cd verify-clone && git rev-list --all --objects | awk '{print $2}' | grep -E '\.
 ---
 
 **Recommendation: approve Section D2–D4 (filter-repo, in-place on the local repo after mirror backup) as the next execution step. This audit made no changes to git history, remotes, credentials, the database, or any infrastructure.**
+
+---
+
+# EXECUTION RECORD — 2026-10-13 (approved cleanup; push BLOCKED by credentials)
+
+## E1. Executed (all local, verified)
+
+| Step | Command / action | Outcome |
+|---|---|---|
+| 1 | `git commit` — docs: added Phase 2/3 reports to Git; added `.workbuddy-ai/` to `.gitignore` | commit `4eabc31` |
+| 2 | Redacted residual identifier literals from the Phase 3 report (secret policy) | commit `e3af293` |
+| 3 | **Backup (mandatory, before rewrite):** `git clone --mirror` → `E:/Development_Laptop/Archive/copy-app-pre-cleanup-backup.git`; `git bundle create` → `E:/Development_Laptop/Archive/copy-app-pre-cleanup.bundle` (901,005 bytes) | verified: 57 commits, log intact |
+| 4 | Built content-scrub rules (`/tmp/replacements.txt`, 2 rules: historical DB host → `redacted-host`, historical DB role → `redacted-role`) — values extracted programmatically from history, never printed | 2 rules |
+| 5 | `git filter-repo --force --invert-paths --path backend/.env --path backend/school_copy.db --path-glob '*.pdf' --path-glob '*.pyc' --replace-text replacements.txt` | 57 commits rewritten in 2.0 s; `origin` remote auto-removed (expected) |
+
+## E2. Post-rewrite verification (all PASS)
+
+| Check | Result |
+|---|---|
+| Historical object scan for `.env`/`.db`/`.pdf`/`.pyc` paths | **EMPTY** |
+| Host/role pattern search across **all** historical blobs | **EMPTY** |
+| Working tree preserved (`backend/.env`, `school_copy.db`, all PDFs) | **on disk, untouched** |
+| `git status` | **clean** |
+| Repo pack size | 891 KiB → **452 KiB** |
+| Commit count | 57 → 55 (two empty commits pruned; content preserved) |
+| `py_compile` all backend modules | **OK** |
+| Config fail-safe suite | **11/11 PASS** |
+| Current `DATABASE_MIGRATION_README.md` host line | placeholder (`<your-neon-host>.neon.tech`) |
+| Security commits present in new history | `587c37d`, `4192906`, `4eabc31`, `e3af293` ✓ |
+
+## E3. Force-push — BLOCKED (owner action required)
+
+- Re-added `origin`; fetched to restore the tracking ref; attempted:
+  `git push origin main --force-with-lease=main:650293f…`
+- **Result: `403 Permission denied` — stored Git credentials belong to GitHub account `smahveenrafique-rgb`, which is NOT the repository owner (`muhammadimranrafique`).**
+- **Remote is unchanged: `refs/heads/main` still points to `650293f` (old, un-cleaned history).** The old credential file, SQLite DB and 45 PDFs therefore **remain publicly accessible until the push succeeds**. (The leaked password itself is neutralized by the completed rotation.)
+- Local state: `main` = `e3af293`, diverged from remote (ahead 54 / behind 51) — the push is required to publish the cleaned history.
+
+## E4. Owner action to publish the cleaned history (one command)
+
+Run on **this machine** with the **repo owner's** GitHub credentials (or a PAT with `repo` scope for `muhammadimranrafique`), from `E:/Development_Laptop/Archive/saleem_copy_app`:
+
+```bash
+git push origin main --force-with-lease=main:650293f5453184f4ac5d2a7355d9119e3a7bd4d5
+```
+
+Alternatives: (a) authenticate the owner account here first (replace the stored credential, e.g. via Git Credential Manager or `git credential reject` + re-login), then the same push; (b) add `smahveenrafique-rgb` as a collaborator with write access and push with that account's credentials; (c) copy this repository folder (or the bundle) to the owner's machine and push from there.
+
+## E5. Post-push verification (to run after E4)
+
+```bash
+git ls-remote origin main                       # must show e3af293 (new tip)
+git clone https://github.com/muhammadimranrafique/copy-app.git /tmp/verify-clone
+cd /tmp/verify-clone && git rev-list --all --objects | awk '{print $2}' | grep -E '\.env$|\.db$|\.pdf$|\.pyc$'   # must be EMPTY
+```
+Also confirm the Vercel project redeploys successfully from the new history (env vars live in the Vercel dashboard and are unaffected).
+
+## E6. Rollback (if anything is wrong after the push)
+
+```bash
+# restore the exact pre-rewrite history from the mirror backup and push it back
+git clone --mirror E:/Development_Laptop/Archive/copy-app-pre-cleanup-backup.git /tmp/restore
+cd /tmp/restore && git push --mirror --force origin
+# or from the bundle:
+git clone E:/Development_Laptop/Archive/copy-app-pre-cleanup.bundle /tmp/restore2
+```
+The backup artifacts must be kept until the push is verified on GitHub. Note: rollback re-exposes the old content — only use if the rewrite itself is found defective.
+
+## E7. Updated status
+
+| Item | Status |
+|---|---|
+| History cleanup performed locally + verified | **DONE** |
+| Publication to GitHub | **BLOCKED — owner credentials (E4)** |
+| Old password exposure | Neutralized by rotation (completed earlier) |
+| Old files' public accessibility | **Still exposed until E4 is executed** |
+| Production `SECRET_KEY` / `ALLOWED_ORIGINS` on VPS | OWNER ACTION REQUIRED |
+| Vercel `VITE_API_BASE_URL` + redeploy | OWNER ACTION REQUIRED |
+| VPS provisioning / DNS / HTTPS | Next phase |
+
+**GO/NO-GO: GO for the (completed) local cleanup. NO-GO for release until E4 is executed and verified, and the Vercel/VPS configuration items are completed.**
