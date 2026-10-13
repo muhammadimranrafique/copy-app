@@ -57,7 +57,7 @@
 |---|---|---|
 | Tracked sensitive files (current) | `git ls-files` pattern counts | **0 / 0 / 0 / 0** |
 | Sensitive paths ever in history | `git rev-list --all --objects` | **73** (1 env, 1 db, 45 PDFs, 27 pyc, +1 shared-blob path) |
-| Credential pattern in HEAD tree | `git grep -lI "npg_"` / `"ep-cool"` / `"redacted-role"` | **none** |
+| Credential pattern in HEAD tree | `git grep -lI` for credential/host/role patterns (values not reproduced) | **none** |
 | Live Railway URL in HEAD tree | `git grep -lI "railway"` | only comments/config, no live URL |
 | `.env` ignored locally | `git check-ignore -v backend/.env` | `.gitignore:27` ✓ |
 | Public history depth | `git rev-list --count origin/main` | 52 commits |
@@ -172,7 +172,7 @@ cd verify-clone && git rev-list --all --objects | awk '{print $2}' | grep -E '\.
 | `git rev-list --all --objects` path scan (history) | 73 sensitive paths; distribution by directory recorded |
 | `git log --all -- backend/.env` + blob enumeration | added in `46df98b`; 6 distinct historical versions |
 | `git hash-object` on the two ORD-1001 PDFs | identical hashes → shared blob, reconciles 45 files vs 44 paths |
-| `git grep -lI` HEAD-tree patterns (`npg_`, `ep-cool`, `redacted-role`) | none |
+| `git grep -lI` HEAD-tree credential/host/role patterns (values not reproduced) | none |
 | `git grep -nI railway` on HEAD | comments/config only, no live URL |
 | `git check-ignore -v backend/.env` + `ls -la` | ignored (`.gitignore:27`); preserved; **content never read** |
 | Config fail-safe suite (Python 3.12.10, pinned venv) | **11/11 PASS** (fresh run) |
