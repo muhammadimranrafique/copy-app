@@ -236,9 +236,10 @@ cd verify-clone && git rev-list --all --objects | awk '{print $2}' | grep -E '\.
 
 - Re-added `origin`; fetched to restore the tracking ref; attempted:
   `git push origin main --force-with-lease=main:650293f…`
-- **Result: `403 Permission denied` — stored Git credentials belong to GitHub account `smahveenrafique-rgb`, which is NOT the repository owner (`muhammadimranrafique`).**
+- **Result: `403 Permission denied` — stored Git credentials belong to GitHub account `smahveenrafique-rgb`, which is NOT the repository owner (`muhammadimranrafique`).** A second credential source on this machine (GitHub CLI, account `maryamacademy001-tech`) is also **pull-only** (`push: false`, verified via the GitHub API). No credential available here can publish the rewrite.
 - **Remote is unchanged: `refs/heads/main` still points to `650293f` (old, un-cleaned history).** The old credential file, SQLite DB and 45 PDFs therefore **remain publicly accessible until the push succeeds**. (The leaked password itself is neutralized by the completed rotation.)
-- Local state: `main` = `e3af293`, diverged from remote (ahead 54 / behind 51) — the push is required to publish the cleaned history.
+- Local state: `main` = `a257ffd` (55 commits), diverged from remote — the push is required to publish the cleaned history.
+- **Note:** the pre-push `git fetch` re-imported the old objects into the local object store (via `refs/remotes/origin/main`). These were purged afterwards (`update-ref -d` + `reflog expire` + `gc --prune=now`); a final scan across **all** refs now shows **0** sensitive paths. The remote-tracking ref was removed, so `git status` shows `origin/main [gone]` until the owner fetches after pushing. The explicit-lease push below does not depend on it.
 
 ## E4. Owner action to publish the cleaned history (one command)
 
@@ -246,6 +247,7 @@ Run on **this machine** with the **repo owner's** GitHub credentials (or a PAT w
 
 ```bash
 git push origin main --force-with-lease=main:650293f5453184f4ac5d2a7355d9119e3a7bd4d5
+# (no remote-tracking ref needed; the lease value is explicit). After a successful push:/ngit fetch origin   # restores origin/main and status display
 ```
 
 Alternatives: (a) authenticate the owner account here first (replace the stored credential, e.g. via Git Credential Manager or `git credential reject` + re-login), then the same push; (b) add `smahveenrafique-rgb` as a collaborator with write access and push with that account's credentials; (c) copy this repository folder (or the bundle) to the owner's machine and push from there.
