@@ -27,6 +27,28 @@ wheels/
 .env
 .env.local
 .env.*.local
+# Never commit real environment files; only sanitized examples are allowed
+!.env.example
+
+# Secrets and credentials
+credentials.json
+*.pem
+*.key
+!public.key
+
+# Virtual environments (explicit, incl. dot-venvs)
+venv/
+.venv/
+env/
+ENV/
+
+# Generated PDFs / receipts (production documents)
+backend/invoices/*.pdf
+backend/receipts/*.pdf
+receipts/*.pdf
+invoices/*.pdf
+test_invoices/
+test_receipts/
 
 # IDEs
 .vscode/
