@@ -91,3 +91,6 @@ htmlcov/
 temp/
 tmp/
 *.tmp
+
+# Local agent memory / project data (never push)
+.workbuddy-ai/
