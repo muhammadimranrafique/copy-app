@@ -1,5 +1,6 @@
 import { useState, useEffect, useCallback } from 'react';
 import { Download, Calendar, CreditCard, Receipt, TrendingDown, Pencil, Trash2 } from 'lucide-react';
+import { API_BASE } from '@/lib/api-config';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
@@ -57,7 +58,7 @@ export function PaymentHistory({ orderId, orderTotal, currentBalance, onDownload
             console.log(`[PaymentHistory] Fetching payments for order: ${orderId}`);
 
             const response = await fetch(
-                `${import.meta.env.VITE_API_BASE_URL || 'http://127.0.0.1:8080/api/v1'}/payments/?orderId=${orderId}`,
+                `${API_BASE}/payments/?orderId=${orderId}`,
                 {
                     headers: {
                         'Authorization': `Bearer ${token}`,
@@ -106,7 +107,7 @@ export function PaymentHistory({ orderId, orderTotal, currentBalance, onDownload
                 toast.loading('Generating receipt...', { id: 'download-receipt' });
                 const token = localStorage.getItem('access_token');
                 const response = await fetch(
-                    `${import.meta.env.VITE_API_BASE_URL || 'http://127.0.0.1:8080/api/v1'}/payments/${paymentId}/receipt`,
+                    `${API_BASE}/payments/${paymentId}/receipt`,
                     {
                         method: 'POST',
                         headers: {

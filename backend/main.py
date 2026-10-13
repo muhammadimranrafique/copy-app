@@ -8,6 +8,7 @@ from models import *  # Import all models
 from config import get_settings
 
 settings = get_settings()
+_is_production = settings.environment == "production"
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
@@ -22,8 +23,11 @@ app = FastAPI(
     description="Backend API for School Copy Manufacturing Business Management",
     version="1.0.0",
     lifespan=lifespan,
-    docs_url="/docs",  # Keep docs at root for easier access
-    openapi_url="/openapi.json",  # Keep OpenAPI spec at root
+    # API documentation is exposed in development only. In production the
+    # interactive docs and the OpenAPI schema are disabled to avoid exposing
+    # the full API surface. Re-enable locally with ENVIRONMENT=development.
+    docs_url=None if _is_production else "/docs",
+    openapi_url=None if _is_production else "/openapi.json",
 )
 
 # CORS Middleware

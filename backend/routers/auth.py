@@ -16,7 +16,16 @@ bearer_scheme = HTTPBearer()
 
 @router.post("/register", response_model=UserRead, status_code=status.HTTP_201_CREATED)
 def register(user_data: UserCreate, session: Session = Depends(get_session)):
-    """Register a new user."""
+    """Register a new user.
+
+    Public self-registration is disabled by default in production. Enable it
+    explicitly with ALLOW_PUBLIC_REGISTRATION=true only if required.
+    """
+    if not settings.allow_public_registration:
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="Public registration is disabled. Contact an administrator to create an account."
+        )
     # Check if email already exists
     statement = select(User).where(User.email == user_data.email)
     existing_user = session.exec(statement).first()

@@ -32,7 +32,7 @@ export const queryClient = new QueryClient({
   },
 });
 
-const API_BASE = import.meta.env.VITE_API_BASE_URL || 'http://127.0.0.1:8080/api/v1';
+import { API_BASE } from './api-config';
 
 if (import.meta.env.PROD) {
   console.log('[API] Using base URL:', API_BASE);

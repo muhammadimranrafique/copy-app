@@ -1,8 +1,9 @@
 // API client that can fall back to mock data. Set VITE_USE_MOCK=true to use the built-in mocks.
+// Mock mode is disabled in production builds (import.meta.env.PROD).
 import { mockOrders, mockLeaders, mockProducts, mockPayments, mockExpenses } from './mock-data';
+import { API_BASE } from './api-config';
 
-const USE_MOCK = import.meta.env.VITE_USE_MOCK === 'true';
-const API_BASE = import.meta.env.VITE_API_BASE_URL || 'http://127.0.0.1:8080/api/v1';
+const USE_MOCK = import.meta.env.VITE_USE_MOCK === 'true' && !import.meta.env.PROD;
 
 function getAuthHeaders() {
   const token = localStorage.getItem('access_token');

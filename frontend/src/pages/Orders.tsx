@@ -1,5 +1,6 @@
 import { useState } from 'react';
 import { Plus, ShoppingCart, DollarSign, Eye, Download, Edit2, Trash2 } from 'lucide-react';
+import { API_BASE } from '@/lib/api-config';
 import { PaymentHistory } from '@/components/PaymentHistory';
 import { useCurrency } from '@/hooks/useCurrency';
 import { useAuth } from '@/lib/useAuth';
@@ -306,7 +307,7 @@ export default function Orders() {
       toast.loading('Generating invoice...', { id: 'download-invoice' });
       const token = localStorage.getItem('access_token');
       const response = await fetch(
-        `${import.meta.env.VITE_API_BASE_URL || 'http://127.0.0.1:8080/api/v1'}/orders/${orderId}/invoice`,
+        `${API_BASE}/orders/${orderId}/invoice`,
         {
           method: 'POST',
           headers: {
