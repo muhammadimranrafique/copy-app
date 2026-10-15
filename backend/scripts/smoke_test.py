@@ -3,7 +3,9 @@ import os
 
 BASE = "http://127.0.0.1:8000"
 ADMIN_USER = "admin"
-ADMIN_PASS = "admin123"
+ADMIN_PASS = os.environ.get("ADMIN_PASSWORD")
+if not ADMIN_PASS:
+    raise SystemExit("ERROR: set the ADMIN_PASSWORD environment variable before running this script.")
 
 s = requests.Session()
 # Login (form data)

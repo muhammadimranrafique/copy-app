@@ -13,6 +13,9 @@ from models import User, Client, Product, ClientType
 
 
 def seed():
+    admin_password = os.environ.get("ADMIN_PASSWORD")
+    if not admin_password:
+        sys.exit("ERROR: set the ADMIN_PASSWORD environment variable before running this script.")
     with Session(engine) as session:
         # Create admin user if missing
         admin_email = "admin"
@@ -22,11 +25,11 @@ def seed():
                 email=admin_email,
                 full_name="Administrator",
                 role="admin",
-                hashed_password=get_password_hash("admin123"),
+                hashed_password=get_password_hash(admin_password),
                 is_active=True
             )
             session.add(admin)
-            print("Added admin user: admin / admin123")
+            print("Added admin user (password from ADMIN_PASSWORD env var)")
         else:
             print("Admin user already exists")
 

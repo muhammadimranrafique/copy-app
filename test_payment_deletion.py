@@ -14,12 +14,15 @@ Requirements:
 
 import requests
 import json
+import os
 from datetime import datetime
 
 # Configuration
 BASE_URL = "http://localhost:8080/api/v1"
 ADMIN_USERNAME = "admin@schoolcopy.com"  # Admin email
-ADMIN_PASSWORD = "admin123"  # Update with your admin password
+ADMIN_PASSWORD = os.environ.get("ADMIN_PASSWORD")  # Set via environment variable
+if not ADMIN_PASSWORD:
+    raise SystemExit("ERROR: set the ADMIN_PASSWORD environment variable before running this script.")
 
 def print_section(title):
     """Print a formatted section header"""

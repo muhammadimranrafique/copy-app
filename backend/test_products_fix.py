@@ -1,5 +1,6 @@
 from database import engine
 from sqlalchemy import text
+import os
 import requests
 
 # Check database
@@ -20,7 +21,7 @@ with engine.connect() as conn:
 print("\n=== API Test ===")
 s = requests.Session()
 resp = s.post('http://127.0.0.1:8000/api/v1/auth/login', 
-              data={'username': 'admin', 'password': 'admin123'})
+              data={'username': 'admin', 'password': os.environ.get('ADMIN_PASSWORD', '')})
 print(f'Login status: {resp.status_code}')
 
 if resp.status_code == 200:

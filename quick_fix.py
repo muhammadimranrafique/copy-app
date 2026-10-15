@@ -72,7 +72,7 @@ def main():
     
     print("\n🔑 Default admin credentials:")
     print("Email: admin@schoolcopy.com")
-    print("Password: admin123")
+    print("Password: set via the ADMIN_PASSWORD environment variable")
     
     # Ask if user wants to start the backend server
     start_backend = input("\nDo you want to start the backend server now? (y/n): ").lower().strip()

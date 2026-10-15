@@ -18,7 +18,7 @@
 | Sensitive-path scan of full history | **0** `.env` / `.db` / `.pdf` / `.pyc` paths | `git rev-list --all --objects` |
 | `.env` handling | `backend/.env` matched by `.gitignore:27`; **untracked** (error-unmatch failed as expected); contents never read or modified (mtime unchanged: Oct 13 19:00) | `git check-ignore`, `git ls-files --error-unmatch`, `ls -la` |
 | Tracked env files | only `backend/.env.example`, `backend/env.example`, `frontend/.env.example`, `frontend/src/vite-env.d.ts` (+ `backend/alembic/env.py`) | `git ls-files` |
-| Credential remnants in tracked files | **NONE** — only placeholder patterns (`host.neon.tech`, `<your-neon-host>.neon.tech`); no real host, role, or password remnants (`ep-cool-bush`/`a1nc2fji`/`neondb_owner` → none) | `git grep` |
+| Credential remnants in tracked files | **NONE** — only placeholder patterns (`host.neon.tech`, `<your-neon-host>.neon.tech`); grep for the real host-prefix/host-id/role patterns (redacted here, as in the Phase 3 report) returns no matches | `git grep` |
 
 ### Deviation from the Phase 3 record — explained, not a problem
 

@@ -4,13 +4,14 @@ Test script to verify the dashboard endpoint is working correctly.
 """
 import requests
 import json
+import os
 from datetime import datetime
 
 # Configuration
 API_BASE = "http://127.0.0.1:8000/api/v1"
 TEST_USER = {
     "email": "admin@schoolcopy.com",
-    "password": "admin123"
+    "password": os.environ.get("ADMIN_PASSWORD", "")
 }
 
 def test_dashboard_endpoint():

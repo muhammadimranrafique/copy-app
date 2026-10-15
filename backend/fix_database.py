@@ -41,16 +41,20 @@ def main():
             ).first()
             
             if not admin_user:
+                admin_password = os.environ.get("ADMIN_PASSWORD")
+                if not admin_password:
+                    print("ERROR: set the ADMIN_PASSWORD environment variable before running this script.")
+                    return False
                 admin_user = User(
                     email="admin@schoolcopy.com",
                     full_name="Admin User",
                     role="admin",
-                    hashed_password=get_password_hash("admin123"),
+                    hashed_password=get_password_hash(admin_password),
                     is_active=True
                 )
                 session.add(admin_user)
                 session.commit()
-                print("✅ Admin user created: admin@schoolcopy.com / admin123")
+                print("Admin user created: admin@schoolcopy.com (password from ADMIN_PASSWORD env var)")
             else:
                 print("ℹ️ Admin user already exists")
                 

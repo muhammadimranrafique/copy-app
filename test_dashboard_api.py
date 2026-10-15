@@ -67,8 +67,8 @@ def test_dashboard_api():
     
     # Test different user credentials
     users_to_test = [
-        {"username": "admin", "password": "admin123"},
-        {"username": "test@example.com", "password": "test123"},
+        {"username": "admin", "password": os.environ.get("ADMIN_PASSWORD", "")},
+        {"username": "test@example.com", "password": os.environ.get("TEST_USER_PASSWORD", "")},
         {"username": "arsal@gmail.com", "password": "password123"}
     ]
     
@@ -164,7 +164,7 @@ def test_dashboard_performance():
     try:
         # Login first
         login_url = "http://127.0.0.1:8000/api/v1/auth/login"
-        login_data = {"username": "admin", "password": "admin123"}
+        login_data = {"username": "admin", "password": os.environ.get("ADMIN_PASSWORD", "")}
         
         login_response = requests.post(login_url, data=login_data)
         if login_response.status_code != 200:

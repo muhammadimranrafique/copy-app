@@ -5,6 +5,7 @@ This script will call the actual API endpoint and check the server logs.
 
 import requests
 import json
+import os
 
 # Configuration
 API_BASE = "http://127.0.0.1:8000/api/v1"
@@ -18,7 +19,7 @@ def login():
             f"{API_BASE}/auth/login",
             data={
                 "username": "admin@example.com",  # Update with actual credentials
-                "password": "admin123"
+                "password": os.environ.get("ADMIN_PASSWORD", "")
             }
         )
         if response.status_code == 200:

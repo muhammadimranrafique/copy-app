@@ -7,9 +7,12 @@ def test_cors():
     origin = "http://localhost:5173"
     
     # Login to get token
+    admin_password = os.environ.get("ADMIN_PASSWORD")
+    if not admin_password:
+        raise SystemExit("ERROR: set the ADMIN_PASSWORD environment variable before running this script.")
     login_data = {
         "username": "admin",
-        "password": "admin123"
+        "password": admin_password
     }
     
     # Test preflight request

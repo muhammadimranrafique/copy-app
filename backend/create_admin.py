@@ -15,7 +15,9 @@ def create_admin_user():
     
     # Admin user details
     email = "admin@schoolcopy.com"
-    password = "admin123"  # Change this to a secure password
+    password = os.environ.get("ADMIN_PASSWORD")
+    if not password:
+        sys.exit("ERROR: set the ADMIN_PASSWORD environment variable before running this script.")
     full_name = "System Administrator"
     role = "admin"
     
@@ -135,7 +137,7 @@ if __name__ == "__main__":
     
     print("=" * 40)
     print("You can now login with:")
-    print("Admin: admin@schoolcopy.com / admin123")
+    print("Admin: admin@schoolcopy.com (password set from ADMIN_PASSWORD env var)")
     print("Staff: staff@schoolcopy.com / staff123")
     print("Test User: arsal@gmail.com / password123")
     print("\n[WARNING] Remember to change default passwords!")

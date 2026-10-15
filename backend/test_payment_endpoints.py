@@ -6,13 +6,16 @@ Run this after starting the backend server.
 
 import requests
 import json
+import os
 from datetime import datetime
 import uuid
 
 # Configuration
 BASE_URL = "http://127.0.0.1:8000/api/v1"
 TEST_USER_EMAIL = "admin@example.com"
-TEST_USER_PASSWORD = "admin123"
+TEST_USER_PASSWORD = os.environ.get("ADMIN_PASSWORD")
+if not TEST_USER_PASSWORD:
+    raise SystemExit("ERROR: set the ADMIN_PASSWORD environment variable before running this script.")
 
 def get_auth_token():
     """Get authentication token for API requests."""

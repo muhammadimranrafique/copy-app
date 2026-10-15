@@ -62,10 +62,12 @@
             
             try {
                 // Test login
+                // Password is prompted at runtime; never hardcode credentials in this file.
+                const adminPassword = prompt('Admin password for the local API:') || '';
                 const loginResponse = await fetch(`${API_V1}/auth/login`, {
                     method: 'POST',
                     headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
-                    body: 'username=admin&password=admin123'
+                    body: 'username=admin&password=' + encodeURIComponent(adminPassword)
                 });
                 
                 if (loginResponse.ok) {
