@@ -88,15 +88,13 @@ def create_test_user(email: str, password: str, full_name: str):
         print(f"User created successfully: {user.id}")
         return user
 
-def test_hash_verification():
+def test_hash_verification(test_password: str):
     """Test hash generation and verification"""
     print("\n=== Testing Hash Generation and Verification ===")
-    
-    test_password = "testpass123"
+
     hash1 = get_password_hash(test_password)
     hash2 = get_password_hash(test_password)
     
-    print(f"Password: {test_password}")
     print(f"Hash 1: {hash1[:50]}...")
     print(f"Hash 2: {hash2[:50]}...")
     print(f"Hashes are different (expected): {hash1 != hash2}")
@@ -104,25 +102,28 @@ def test_hash_verification():
     # Test verification
     verify1 = verify_password(test_password, hash1)
     verify2 = verify_password(test_password, hash2)
-    verify_wrong = verify_password("wrongpassword", hash1)
+    verify_wrong = verify_password(f"{test_password}-wrong", hash1)
     
     print(f"Verify correct password with hash1: {verify1}")
     print(f"Verify correct password with hash2: {verify2}")
     print(f"Verify wrong password with hash1: {verify_wrong}")
 
 if __name__ == "__main__":
+    test_password = os.environ.get("DEBUG_TEST_PASSWORD")
+    if not test_password:
+        sys.exit("ERROR: set DEBUG_TEST_PASSWORD before running this script.")
+
     print("School Copy Authentication Debug Tool")
     print("=" * 50)
     
     # Test hash functionality first
-    test_hash_verification()
+    test_hash_verification(test_password)
     
     # Check existing users
     check_users()
     
     # Test specific user if exists
     test_email = "arsal@gmail.com"
-    test_password = "password123"  # Replace with the actual password you're trying
     
     # Test password verification
     test_password_verification(test_email, test_password)

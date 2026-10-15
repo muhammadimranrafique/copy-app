@@ -51,7 +51,6 @@ def create_admin_user():
         
         print("[SUCCESS] Admin user created successfully!")
         print(f"Email: {email}")
-        print(f"Password: {password}")
         print(f"Full Name: {full_name}")
         print(f"Role: {role}")
         print(f"User ID: {admin_user.id}")
@@ -65,7 +64,9 @@ def create_staff_user():
     
     # Staff user details
     email = "staff@schoolcopy.com"
-    password = "staff123"  # Change this to a secure password
+    password = os.environ.get("STAFF_PASSWORD")
+    if not password:
+        sys.exit("ERROR: set the STAFF_PASSWORD environment variable before running this script.")
     full_name = "Staff User"
     role = "staff"
     
@@ -95,7 +96,6 @@ def create_staff_user():
         
         print("[SUCCESS] Staff user created successfully!")
         print(f"Email: {email}")
-        print(f"Password: {password}")
         print(f"Full Name: {full_name}")
         print(f"Role: {role}")
         print(f"User ID: {staff_user.id}")
@@ -137,7 +137,5 @@ if __name__ == "__main__":
     
     print("=" * 40)
     print("You can now login with:")
-    print("Admin: admin@schoolcopy.com (password set from ADMIN_PASSWORD env var)")
-    print("Staff: staff@schoolcopy.com / staff123")
-    print("Test User: arsal@gmail.com / password123")
-    print("\n[WARNING] Remember to change default passwords!")
+    print("Admin password is supplied through ADMIN_PASSWORD.")
+    print("Staff password is supplied through STAFF_PASSWORD.")
