@@ -9,13 +9,18 @@ import json
 import os
 from datetime import datetime
 import uuid
+import pytest
 
 # Configuration
 BASE_URL = "http://127.0.0.1:8000/api/v1"
 TEST_USER_EMAIL = "admin@example.com"
 TEST_USER_PASSWORD = os.environ.get("ADMIN_PASSWORD")
 if not TEST_USER_PASSWORD:
-    raise SystemExit("ERROR: set the ADMIN_PASSWORD environment variable before running this script.")
+    pytest.skip(
+        "ADMIN_PASSWORD not set; these live API tests require a running "
+        "server and admin credentials",
+        allow_module_level=True,
+    )
 
 def get_auth_token():
     """Get authentication token for API requests."""

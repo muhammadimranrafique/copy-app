@@ -1,12 +1,17 @@
 import requests
 import json
 import os
+import pytest
 
 BASE = "http://127.0.0.1:8000"
 ADMIN_USER = "admin"
 ADMIN_PASS = os.environ.get("ADMIN_PASSWORD")
 if not ADMIN_PASS:
-    raise SystemExit("ERROR: set the ADMIN_PASSWORD environment variable before running this script.")
+    pytest.skip(
+        "ADMIN_PASSWORD not set; these live API tests require a running "
+        "server and admin credentials",
+        allow_module_level=True,
+    )
 
 def test_products_api():
     s = requests.Session()
